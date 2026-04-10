@@ -1,3 +1,4 @@
+import { Check, Lock } from "lucide-react";
 import type { ActionPlan } from "./ActionPlanCard";
 
 interface JourneyRoadmapProps {
@@ -7,18 +8,19 @@ interface JourneyRoadmapProps {
 
 const PANEL_WIDTH = 220;
 const GREEN = "#53D88B";
-const GREY_FILL = "#f5f5f5";
+const GREY_FILL = "#f0f0f0";
 const GREY_STROKE = "#d0d0d0";
-const PATH_STROKE = "#e5e5e5";
+/** Gold / amber accent — matches existing palette (e.g. Plan stage accent) */
+const PATH_AMBER = "#F5C423";
 const MUTED = "#aaa";
-const TEXT = "#666";
+const TEXT = "#333";
 
 /**
  * Left rail: vertical S-curve journey map, styled to pair with ProgressSidebar (right).
  */
 export default function JourneyRoadmap({ constellationShown, actionPlan }: JourneyRoadmapProps) {
-  const exploreActive = constellationShown;
-  const planActive = !!actionPlan;
+  const exploreComplete = constellationShown;
+  const planComplete = !!actionPlan;
 
   return (
     <div
@@ -36,106 +38,177 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
         boxSizing: "border-box",
       }}
     >
-      <p
+      <h2
         style={{
-          fontSize: 10,
-          fontWeight: 600,
+          fontSize: 13,
+          fontWeight: 700,
           textTransform: "uppercase",
-          letterSpacing: "1.5px",
-          color: "#aaa",
-          margin: "0 0 16px",
+          letterSpacing: "0.1em",
+          color: TEXT,
+          margin: "0 0 18px",
+          lineHeight: 1.35,
         }}
       >
         Your journey
-      </p>
+      </h2>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
-        {/* S-curve spine + nodes */}
-        <div style={{ width: 40, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <JourneyNode active={exploreActive} />
-          <SConnector flip={false} />
-          <JourneyNode active={planActive} />
-          <SConnector flip />
-          <JourneyNode dim />
-          <SConnector flip={false} />
-          <JourneyNode dim />
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* Explore */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 36,
+              flexShrink: 0,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ProgressNode complete={exploreComplete} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.25 }}>Explore</div>
+            {exploreComplete && (
+              <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>
+                Industry Constellation
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Stage copy — mirrors sidebar typography */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0 }}>
-          <StageCopy title="Explore" active={exploreActive} activeDetail="Industry Constellation" />
-          <div style={{ height: 28 }} />
-          <StageCopy title="Plan" active={planActive} activeDetail="Action Plan" />
-          <div style={{ height: 28 }} />
-          <StageCopy title="Build" comingSoon />
-          <div style={{ height: 28 }} />
-          <StageCopy title="Reflect" comingSoon />
+        <SConnector flip={false} />
+
+        {/* Plan */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 36,
+              flexShrink: 0,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ProgressNode complete={planComplete} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.25 }}>Plan</div>
+            {planComplete && (
+              <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>
+                Action Plan
+              </div>
+            )}
+          </div>
+        </div>
+
+        <SConnector flip />
+
+        {/* Build */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 36,
+              flexShrink: 0,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <LockedNode />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, lineHeight: 1.25 }}>Build</div>
+            <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
+          </div>
+        </div>
+
+        <SConnector flip={false} />
+
+        {/* Reflect */}
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 36,
+              flexShrink: 0,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <LockedNode />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, lineHeight: 1.25 }}>Reflect</div>
+            <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function JourneyNode({ active, dim }: { active?: boolean; dim?: boolean }) {
+/** Explore / Plan: always green; ? until stage complete, then checkmark */
+function ProgressNode({ complete }: { complete: boolean }) {
   return (
     <div
       style={{
-        width: 18,
-        height: 18,
+        width: 28,
+        height: 28,
         borderRadius: "50%",
-        background: active ? GREEN : GREY_FILL,
-        border: `2px solid ${active ? GREEN : dim ? GREY_STROKE : GREY_STROKE}`,
+        background: GREEN,
+        border: `2px solid ${GREEN}`,
         boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
         flexShrink: 0,
-        opacity: dim ? 0.75 : 1,
       }}
-    />
+    >
+      {complete ? (
+        <Check size={15} strokeWidth={2.75} aria-hidden />
+      ) : (
+        <span style={{ fontSize: 14, fontWeight: 700, lineHeight: 1, userSelect: "none" }} aria-hidden>
+          ?
+        </span>
+      )}
+    </div>
   );
 }
 
-/** Short vertical S fragment between two nodes */
+/** Build / Reflect: grey circle + lock */
+function LockedNode() {
+  return (
+    <div
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        background: GREY_FILL,
+        border: `2px solid ${GREY_STROKE}`,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#888",
+        flexShrink: 0,
+      }}
+    >
+      <Lock size={13} strokeWidth={2.25} aria-hidden />
+    </div>
+  );
+}
+
+/** S fragment between nodes — single amber colour */
 function SConnector({ flip }: { flip?: boolean }) {
   const d = flip
-    ? "M 20 0 C 6 5, 6 12, 20 16 C 34 21, 34 26, 20 28"
-    : "M 20 0 C 34 5, 34 12, 20 16 C 6 21, 6 26, 20 28";
+    ? "M 18 0 C 4 5, 4 12, 18 16 C 32 21, 32 26, 18 28"
+    : "M 18 0 C 32 5, 32 12, 18 16 C 4 21, 4 26, 18 28";
   return (
-    <svg width={40} height={28} viewBox="0 0 40 28" style={{ display: "block" }} aria-hidden>
-      <path d={d} fill="none" stroke={PATH_STROKE} strokeWidth={2.25} strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function StageCopy({
-  title,
-  active,
-  activeDetail,
-  comingSoon,
-}: {
-  title: string;
-  active?: boolean;
-  activeDetail?: string;
-  comingSoon?: boolean;
-}) {
-  return (
-    <div style={{ minHeight: 44 }}>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: active ? GREEN : comingSoon ? MUTED : MUTED,
-          lineHeight: 1.25,
-        }}
-      >
-        {title}
-      </div>
-      {comingSoon ? (
-        <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>Coming soon</div>
-      ) : (
-        active &&
-        activeDetail && (
-          <div style={{ fontSize: 10, color: GREEN, marginTop: 4, fontWeight: 500 }}>{activeDetail}</div>
-        )
-      )}
+    <div style={{ paddingLeft: 9, margin: "2px 0" }}>
+      <svg width={36} height={28} viewBox="0 0 36 28" style={{ display: "block" }} aria-hidden>
+        <path d={d} fill="none" stroke={PATH_AMBER} strokeWidth={2.5} strokeLinecap="round" />
+      </svg>
     </div>
   );
 }
