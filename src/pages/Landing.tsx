@@ -62,9 +62,6 @@ export default function Landing() {
               <p className="text-sm text-muted-foreground">
                 Includes an interactive career map and personalised action plan.
               </p>
-              <p className="text-sm text-muted-foreground">
-                You will land directly in the Explore flow.
-              </p>
             </div>
           </div>
 
