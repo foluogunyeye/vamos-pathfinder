@@ -8,6 +8,7 @@ import ActionPlanCard, { type ActionPlan } from "./ActionPlanCard";
 import SaveProgressPrompt from "./SaveProgressPrompt";
 import ProgressSavedToast from "./ProgressSavedToast";
 import ProgressSidebar from "./ProgressSidebar";
+import JourneyRoadmap from "./JourneyRoadmap";
 import { getConnectedClusterNames } from "@/data/constellationData";
 import { useAuth } from "@/hooks/useAuth";
 import { useProgressSave, type SavedProgress } from "@/hooks/useProgressSave";
@@ -384,19 +385,27 @@ const PathfinderChat = () => {
     : -1;
 
   const showSidebar = !isMobile && started && constellationShown;
+  const showJourneyRoadmap = !isMobile && started;
 
   return (
     <div
       style={{
         display: "flex",
         height: "100dvh",
+        width: "100%",
         justifyContent: "center",
+        alignItems: "stretch",
       }}
     >
+      {showJourneyRoadmap && (
+        <JourneyRoadmap constellationShown={constellationShown} actionPlan={actionPlan} />
+      )}
     <div
       style={{
         maxWidth: 680,
         width: "100%",
+        flex: 1,
+        minWidth: 0,
         padding: "24px 16px",
         fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex",
