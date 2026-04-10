@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import { useLocation } from "react-router-dom";
 import IndustryConstellation from "./IndustryConstellation";
 import WelcomeScreen from "./WelcomeScreen";
 import StageBadge, { type Stage } from "./StageBadge";
@@ -29,6 +30,7 @@ function stripShowConstellationTag(text: string): string {
 }
 
 const PathfinderChat = () => {
+  const location = useLocation();
   const isMobile = useIsMobile();
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,6 +60,8 @@ const PathfinderChat = () => {
 
   const { user, loading: authLoading, signInWithMagicLink, signOut } = useAuth();
   const { saveProgress, loadProgress } = useProgressSave(user);
+
+  const autoStartRef = useRef(false);
 
   // Load saved progress on auth
   useEffect(() => {
@@ -290,10 +294,38 @@ const PathfinderChat = () => {
       setConstellationShown(false);
       setShowSaveAfterConstellation(false);
       setShowSaveAfterActionPlan(false);
+      setCurrentStage(stageTitle as Stage);
       sendMessages([], ctx);
     },
     [sendMessages]
   );
+
+  // Deep link: /pathfinder?stage=explore|planbuild|reflect
+  // Starts the chosen flow once, then falls back to normal UI behavior.
+  useEffect(() => {
+    if (autoStartRef.current) return;
+    if (started) return;
+    if (authLoading) return;
+
+    const stage = new URLSearchParams(location.search).get("stage");
+    if (!stage) return;
+
+    const stageId = stage.toLowerCase();
+    if (stageId === "explore") {
+      autoStartRef.current = true;
+      handleStageSelect("explore", "Explore");
+      return;
+    }
+    if (stageId === "planbuild") {
+      autoStartRef.current = true;
+      handleStageSelect("planbuild", "Plan");
+      return;
+    }
+    if (stageId === "reflect") {
+      autoStartRef.current = true;
+      handleStageSelect("reflect", "Reflect");
+    }
+  }, [location.search, started, authLoading, handleStageSelect]);
 
   const handleContinueSession = useCallback(() => {
     if (!savedProgressData) return;
