@@ -1,0 +1,6 @@
+# Overwritten when you run: supabase link --project-ref <your-ref>
+# Ref is the subdomain of https://<ref>.supabase.co (must match VITE_SUPABASE_URL).
+project_id = "tbifskzrmkfkbbeumzac"
+
+[functions.chat]
+verify_jwt = true
