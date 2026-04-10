@@ -29,6 +29,9 @@ function stripShowConstellationTag(text: string): string {
   return text.replace(SHOW_CONSTELLATION_RE, "").trim();
 }
 
+const PATHFINDER_ORIENTATION_INTRO =
+  "I'll guide you to your Industry Constellation and a personalised action plan — I just need to ask you a few quick questions first.";
+
 const PathfinderChat = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -164,7 +167,16 @@ const PathfinderChat = () => {
       let accumulated = "";
       let buffer = "";
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      // First turn with no prior messages: show a one-line orientation, then stream the AI opener below it.
+      if (allMessages.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: PATHFINDER_ORIENTATION_INTRO },
+          { role: "assistant", content: "" },
+        ]);
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      }
 
       while (true) {
         const { done, value } = await reader.read();

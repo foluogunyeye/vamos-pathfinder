@@ -55,10 +55,13 @@ export default function Landing() {
               powered career navigation tool that meets students where they are.
             </p>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button asChild className="rounded-full px-6">
+            <div className="flex flex-col gap-3">
+              <Button asChild className="w-fit rounded-full px-6">
                 <Link to="/pathfinder?stage=explore">Start exploring with Pathfinder</Link>
               </Button>
+              <p className="text-sm text-muted-foreground">
+                Includes an interactive career map and personalised action plan.
+              </p>
               <p className="text-sm text-muted-foreground">
                 You will land directly in the Explore flow.
               </p>
