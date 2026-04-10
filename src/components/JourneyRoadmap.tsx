@@ -6,17 +6,20 @@ interface JourneyRoadmapProps {
   actionPlan: ActionPlan | null;
 }
 
-const PANEL_WIDTH = 220;
+/** Wider rail so road-style path reads clearly */
+const PANEL_WIDTH = 280;
+const ROAD_COL_WIDTH = 108;
 const GREEN = "#53D88B";
 const GREY_FILL = "#f0f0f0";
 const GREY_STROKE = "#d0d0d0";
-/** Gold / amber accent — matches existing palette (e.g. Plan stage accent) */
-const PATH_AMBER = "#F5C423";
+const AMBER = "#F5C423";
+const ROAD_BASE = "#06202E";
+const ROAD_DASH = "#ffffff";
 const MUTED = "#aaa";
 const TEXT = "#333";
 
 /**
- * Left rail: vertical S-curve journey map, styled to pair with ProgressSidebar (right).
+ * Left rail: road-style path between nodules (landing page RoadSegment style), paired with ProgressSidebar.
  */
 export default function JourneyRoadmap({ constellationShown, actionPlan }: JourneyRoadmapProps) {
   const exploreComplete = constellationShown;
@@ -27,7 +30,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
       className="animate-fade-in"
       style={{
         width: PANEL_WIDTH,
-        padding: "20px 16px",
+        padding: "20px 18px",
         fontFamily: "'Roboto', sans-serif",
         fontSize: 12,
         color: TEXT,
@@ -57,7 +60,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              width: 36,
+              width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
               justifyContent: "center",
@@ -66,23 +69,16 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           >
             <ProgressNode complete={exploreComplete} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.25 }}>Explore</div>
-            {exploreComplete && (
-              <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>
-                Industry Constellation
-              </div>
-            )}
-          </div>
+          <LabelBlock title="Explore" complete={exploreComplete} detail="Industry Constellation" />
         </div>
 
-        <SConnector flip={false} />
+        <RoadConnector flip={false} />
 
         {/* Plan */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              width: 36,
+              width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
               justifyContent: "center",
@@ -91,23 +87,16 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           >
             <ProgressNode complete={planComplete} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.25 }}>Plan</div>
-            {planComplete && (
-              <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>
-                Action Plan
-              </div>
-            )}
-          </div>
+          <LabelBlock title="Plan" complete={planComplete} detail="Action Plan" />
         </div>
 
-        <SConnector flip />
+        <RoadConnector flip />
 
         {/* Build */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              width: 36,
+              width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
               justifyContent: "center",
@@ -116,19 +105,16 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           >
             <LockedNode />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, lineHeight: 1.25 }}>Build</div>
-            <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
-          </div>
+          <LabelBlock title="Build" comingSoon />
         </div>
 
-        <SConnector flip={false} />
+        <RoadConnector flip={false} />
 
         {/* Reflect */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
           <div
             style={{
-              width: 36,
+              width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
               justifyContent: "center",
@@ -137,38 +123,61 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           >
             <LockedNode />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: MUTED, lineHeight: 1.25 }}>Reflect</div>
-            <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
-          </div>
+          <LabelBlock title="Reflect" comingSoon />
         </div>
       </div>
     </div>
   );
 }
 
-/** Explore / Plan: always green; ? until stage complete, then checkmark */
+function LabelBlock({
+  title,
+  complete,
+  detail,
+  comingSoon,
+}: {
+  title: string;
+  complete?: boolean;
+  detail?: string;
+  comingSoon?: boolean;
+}) {
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: comingSoon ? MUTED : TEXT, lineHeight: 1.25 }}>{title}</div>
+      {comingSoon ? (
+        <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
+      ) : (
+        complete &&
+        detail && (
+          <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>{detail}</div>
+        )
+      )}
+    </div>
+  );
+}
+
+/** Explore / Plan: white disc + green ring; amber ? until done, then Vamos green checkmark */
 function ProgressNode({ complete }: { complete: boolean }) {
   return (
     <div
       style={{
-        width: 28,
-        height: 28,
+        width: 30,
+        height: 30,
         borderRadius: "50%",
-        background: GREEN,
+        background: "#fff",
         border: `2px solid ${GREEN}`,
         boxSizing: "border-box",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#fff",
         flexShrink: 0,
+        boxShadow: "0 1px 2px rgba(6, 32, 46, 0.08)",
       }}
     >
       {complete ? (
-        <Check size={15} strokeWidth={2.75} aria-hidden />
+        <Check size={16} color={GREEN} strokeWidth={2.75} aria-hidden />
       ) : (
-        <span style={{ fontSize: 14, fontWeight: 700, lineHeight: 1, userSelect: "none" }} aria-hidden>
+        <span style={{ fontSize: 15, fontWeight: 800, lineHeight: 1, userSelect: "none", color: AMBER }} aria-hidden>
           ?
         </span>
       )}
@@ -176,13 +185,12 @@ function ProgressNode({ complete }: { complete: boolean }) {
   );
 }
 
-/** Build / Reflect: grey circle + lock */
 function LockedNode() {
   return (
     <div
       style={{
-        width: 28,
-        height: 28,
+        width: 30,
+        height: 30,
         borderRadius: "50%",
         background: GREY_FILL,
         border: `2px solid ${GREY_STROKE}`,
@@ -199,15 +207,45 @@ function LockedNode() {
   );
 }
 
-/** S fragment between nodes — single amber colour */
-function SConnector({ flip }: { flip?: boolean }) {
+/**
+ * Road connector — same language as landing WelcomeScreen RoadSegment:
+ * dark asphalt (#06202E) + white dashed centre line.
+ */
+function RoadConnector({ flip }: { flip?: boolean }) {
   const d = flip
-    ? "M 18 0 C 4 5, 4 12, 18 16 C 32 21, 32 26, 18 28"
-    : "M 18 0 C 32 5, 32 12, 18 16 C 4 21, 4 26, 18 28";
+    ? "M 26 3 C 26 22 82 24 82 42 C 82 52 26 54 26 66"
+    : "M 82 3 C 82 22 26 24 26 42 C 26 52 82 54 82 66";
+
   return (
-    <div style={{ paddingLeft: 9, margin: "2px 0" }}>
-      <svg width={36} height={28} viewBox="0 0 36 28" style={{ display: "block" }} aria-hidden>
-        <path d={d} fill="none" stroke={PATH_AMBER} strokeWidth={2.5} strokeLinecap="round" />
+    <div
+      style={{
+        width: ROAD_COL_WIDTH,
+        height: 52,
+        flexShrink: 0,
+        alignSelf: "flex-start",
+        marginLeft: 0,
+        marginTop: 2,
+        marginBottom: 2,
+      }}
+    >
+      <svg
+        width="100%"
+        height="52"
+        viewBox="0 0 108 70"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ display: "block" }}
+        aria-hidden
+      >
+        {/* Proportional to WelcomeScreen RoadSegment (~19.5 / 400 width) */}
+        <path d={d} fill="none" stroke={ROAD_BASE} strokeWidth={5.5} strokeLinecap="round" />
+        <path
+          d={d}
+          fill="none"
+          stroke={ROAD_DASH}
+          strokeWidth={1.1}
+          strokeDasharray="8 6"
+          strokeLinecap="round"
+        />
       </svg>
     </div>
   );
