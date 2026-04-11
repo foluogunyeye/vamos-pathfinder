@@ -6,8 +6,12 @@ interface JourneyRoadmapProps {
   actionPlan: ActionPlan | null;
 }
 
-const PANEL_WIDTH = 280;
-const ROAD_COL_WIDTH = 108;
+const PANEL_WIDTH = 240;
+/** Tight column: 30px nodes sit at the inner edge so labels are not pushed right by empty rail width */
+const ROAD_COL_WIDTH = 40;
+const NODE_SIZE = 30;
+/** Vertical dash passes through circle centre when nodes are right-aligned */
+const CONNECTOR_CENTER_X = ROAD_COL_WIDTH - NODE_SIZE / 2;
 const GREEN = "#53D88B";
 const GREY_FILL = "#9ca3af";
 const AMBER = "#F5C423";
@@ -16,7 +20,7 @@ const CONNECTOR_NAVY = "#1e3a5f";
 const MUTED = "#aaa";
 const TEXT = "#333";
 /** Horizontal space between circle nodes and Explore / Plan / Build / Reflect labels */
-const LABEL_ROW_GAP = 16;
+const LABEL_ROW_GAP = 6;
 
 /**
  * Left rail: vertical dashed navy lines between nodes, paired with ProgressSidebar.
@@ -30,7 +34,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
       className="animate-fade-in"
       style={{
         width: PANEL_WIDTH,
-        padding: "20px 18px",
+        padding: "20px 14px 20px 12px",
         fontFamily: "'Roboto', sans-serif",
         fontSize: 12,
         color: TEXT,
@@ -63,7 +67,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-end",
               alignItems: "center",
             }}
           >
@@ -81,7 +85,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-end",
               alignItems: "center",
             }}
           >
@@ -99,7 +103,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-end",
               alignItems: "center",
             }}
           >
@@ -117,7 +121,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               width: ROAD_COL_WIDTH,
               flexShrink: 0,
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-end",
               alignItems: "center",
             }}
           >
@@ -161,8 +165,8 @@ function ProgressNode({ complete }: { complete: boolean }) {
   return (
     <div
       style={{
-        width: 30,
-        height: 30,
+        width: NODE_SIZE,
+        height: NODE_SIZE,
         borderRadius: "50%",
         background: complete ? GREEN : AMBER,
         boxSizing: "border-box",
@@ -188,8 +192,8 @@ function LockedNode() {
   return (
     <div
       style={{
-        width: 30,
-        height: 30,
+        width: NODE_SIZE,
+        height: NODE_SIZE,
         borderRadius: "50%",
         background: GREY_FILL,
         boxSizing: "border-box",
@@ -207,7 +211,7 @@ function LockedNode() {
 /** Plain vertical navy dashed line between node circles */
 function RoadConnector() {
   const h = 52;
-  const cx = ROAD_COL_WIDTH / 2;
+  const cx = CONNECTOR_CENTER_X;
 
   return (
     <div
