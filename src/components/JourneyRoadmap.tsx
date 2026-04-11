@@ -6,19 +6,20 @@ interface JourneyRoadmapProps {
   actionPlan: ActionPlan | null;
 }
 
-/** Wider rail so road-style path reads clearly */
 const PANEL_WIDTH = 280;
 const ROAD_COL_WIDTH = 108;
 const GREEN = "#53D88B";
 const GREY_FILL = "#9ca3af";
 const AMBER = "#F5C423";
-const ROAD_BASE = "#06202E";
-const ROAD_DASH = "#ffffff";
+/** Navy vertical dashed connectors between journey nodes */
+const CONNECTOR_NAVY = "#1e3a5f";
 const MUTED = "#aaa";
 const TEXT = "#333";
+/** Horizontal space between circle nodes and Explore / Plan / Build / Reflect labels */
+const LABEL_ROW_GAP = 16;
 
 /**
- * Left rail: road-style path between nodules (landing page RoadSegment style), paired with ProgressSidebar.
+ * Left rail: vertical dashed navy lines between nodes, paired with ProgressSidebar.
  */
 export default function JourneyRoadmap({ constellationShown, actionPlan }: JourneyRoadmapProps) {
   const exploreComplete = constellationShown;
@@ -56,7 +57,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
 
       <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
         {/* Explore */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: LABEL_ROW_GAP }}>
           <div
             style={{
               width: ROAD_COL_WIDTH,
@@ -71,10 +72,10 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           <LabelBlock title="Explore" complete={exploreComplete} detail="Industry Constellation" />
         </div>
 
-        <RoadConnector flip={false} />
+        <RoadConnector />
 
         {/* Plan */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: LABEL_ROW_GAP }}>
           <div
             style={{
               width: ROAD_COL_WIDTH,
@@ -89,10 +90,10 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           <LabelBlock title="Plan" complete={planComplete} detail="Action Plan" />
         </div>
 
-        <RoadConnector flip />
+        <RoadConnector />
 
         {/* Build */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: LABEL_ROW_GAP }}>
           <div
             style={{
               width: ROAD_COL_WIDTH,
@@ -107,10 +108,10 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           <LabelBlock title="Build" comingSoon />
         </div>
 
-        <RoadConnector flip={false} />
+        <RoadConnector />
 
         {/* Reflect */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: LABEL_ROW_GAP }}>
           <div
             style={{
               width: ROAD_COL_WIDTH,
@@ -203,43 +204,38 @@ function LockedNode() {
   );
 }
 
-/**
- * Road connector — same language as landing WelcomeScreen RoadSegment:
- * dark asphalt (#06202E) + white dashed centre line.
- */
-function RoadConnector({ flip }: { flip?: boolean }) {
-  const d = flip
-    ? "M 26 3 C 26 22 82 24 82 42 C 82 52 26 54 26 66"
-    : "M 82 3 C 82 22 26 24 26 42 C 26 52 82 54 82 66";
+/** Plain vertical navy dashed line between node circles */
+function RoadConnector() {
+  const h = 52;
+  const cx = ROAD_COL_WIDTH / 2;
 
   return (
     <div
       style={{
         width: ROAD_COL_WIDTH,
-        height: 52,
+        height: h,
         flexShrink: 0,
         alignSelf: "flex-start",
-        marginLeft: 0,
         marginTop: 2,
         marginBottom: 2,
       }}
     >
       <svg
         width="100%"
-        height="52"
-        viewBox="0 0 108 70"
+        height={h}
+        viewBox={`0 0 ${ROAD_COL_WIDTH} ${h}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ display: "block" }}
         aria-hidden
       >
-        {/* Proportional to WelcomeScreen RoadSegment (~19.5 / 400 width) */}
-        <path d={d} fill="none" stroke={ROAD_BASE} strokeWidth={5.5} strokeLinecap="round" />
-        <path
-          d={d}
-          fill="none"
-          stroke={ROAD_DASH}
-          strokeWidth={1.1}
-          strokeDasharray="8 6"
+        <line
+          x1={cx}
+          y1={0}
+          x2={cx}
+          y2={h}
+          stroke={CONNECTOR_NAVY}
+          strokeWidth={2}
+          strokeDasharray="14 8"
           strokeLinecap="round"
         />
       </svg>
