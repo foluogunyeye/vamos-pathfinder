@@ -10,8 +10,7 @@ interface JourneyRoadmapProps {
 const PANEL_WIDTH = 280;
 const ROAD_COL_WIDTH = 108;
 const GREEN = "#53D88B";
-const GREY_FILL = "#f0f0f0";
-const GREY_STROKE = "#d0d0d0";
+const GREY_FILL = "#9ca3af";
 const AMBER = "#F5C423";
 const ROAD_BASE = "#06202E";
 const ROAD_DASH = "#ffffff";
@@ -156,7 +155,7 @@ function LabelBlock({
   );
 }
 
-/** Explore / Plan: white disc + green ring; amber ? until done, then Vamos green checkmark */
+/** Explore / Plan: solid amber + white ?; complete → solid Vamos green + white check */
 function ProgressNode({ complete }: { complete: boolean }) {
   return (
     <div
@@ -164,20 +163,19 @@ function ProgressNode({ complete }: { complete: boolean }) {
         width: 30,
         height: 30,
         borderRadius: "50%",
-        background: "#fff",
-        border: `2px solid ${GREEN}`,
+        background: complete ? GREEN : AMBER,
         boxSizing: "border-box",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        boxShadow: "0 1px 2px rgba(6, 32, 46, 0.08)",
+        boxShadow: "0 1px 2px rgba(6, 32, 46, 0.12)",
       }}
     >
       {complete ? (
-        <Check size={16} color={GREEN} strokeWidth={2.75} aria-hidden />
+        <Check size={16} color="#ffffff" strokeWidth={2.75} aria-hidden />
       ) : (
-        <span style={{ fontSize: 15, fontWeight: 800, lineHeight: 1, userSelect: "none", color: AMBER }} aria-hidden>
+        <span style={{ fontSize: 15, fontWeight: 800, lineHeight: 1, userSelect: "none", color: "#ffffff" }} aria-hidden>
           ?
         </span>
       )}
@@ -193,16 +191,14 @@ function LockedNode() {
         height: 30,
         borderRadius: "50%",
         background: GREY_FILL,
-        border: `2px solid ${GREY_STROKE}`,
         boxSizing: "border-box",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#888",
         flexShrink: 0,
       }}
     >
-      <Lock size={13} strokeWidth={2.25} aria-hidden />
+      <Lock size={13} strokeWidth={2.25} color="#ffffff" aria-hidden />
     </div>
   );
 }
