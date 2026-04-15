@@ -22,7 +22,11 @@ interface ChatMessage {
 }
 
 const STAGE_REGEX = /^\[STAGE:(Explore|Plan|Build|Reflect)\]\s*/;
-const ACTION_PLAN_REGEX = /\[ACTION_PLAN:\s*(\{[\s\S]*?\})\]\s*$/;
+/**
+ * Extract action plan JSON anywhere in the message.
+ * Not anchored to end because the model sometimes appends trailing text/newlines.
+ */
+const ACTION_PLAN_REGEX = /\[ACTION_PLAN:\s*(\{[\s\S]*?\})\]/g;
 /** Strip from UI always; constellation UI only toggles on first trigger in this session. */
 const SHOW_CONSTELLATION_RE = /\[SHOW_CONSTELLATION\]\s*/g;
 
@@ -203,10 +207,11 @@ const PathfinderChat = () => {
                 }
               }
 
-              const actionPlanMatch = display.match(ACTION_PLAN_REGEX);
-              if (actionPlanMatch) {
+              const actionPlanMatches = [...display.matchAll(ACTION_PLAN_REGEX)];
+              if (actionPlanMatches.length > 0) {
                 try {
-                  const parsed = JSON.parse(actionPlanMatch[1]) as ActionPlan;
+                  const last = actionPlanMatches[actionPlanMatches.length - 1];
+                  const parsed = JSON.parse(last[1]) as ActionPlan;
                   setActionPlan(parsed);
                   setActionPlanCount(prev => prev + 1);
                   setActionPlanOffered(true);
