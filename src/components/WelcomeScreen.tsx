@@ -22,23 +22,36 @@ const STAGES: StageData[] = [
   },
   {
     id: "planbuild",
-    title: "Plan & Build",
-    quote: "I have some ideas but I need a plan and the right experiences",
+    title: "Plan",
+    quote:
+      "I have a direction in mind (like a field, a role, or a type of work) but I'm not sure what the path from here actually looks like or where to start.",
     bullets: [
-      "Turn vague interests into a concrete action plan",
-      "Get specific next steps: societies, programmes, projects, careers service support",
+      "See what the path from where you are to your goal actually looks like",
+      "Get a concrete action plan for what to do now",
     ],
     bg: "#F5C423",
   },
   {
+    id: "planbuild",
+    title: "Build",
+    quote:
+      "I know the job or field I'm working toward. I want to figure out what experiences, skills, and opportunities I should be going after to become a strong candidate.",
+    bullets: [
+      "Get a milestone roadmap for building your candidacy",
+      "Find the right experiences, skills, and opportunities for your target role",
+    ],
+    bg: "#53D88B",
+  },
+  {
     id: "reflect",
     title: "Reflect",
-    quote: "I've done stuff but I still feel lost",
+    quote:
+      "I've built up experience (internships, jobs, projects, or study) and I want to make sense of what it all points to and what comes next.",
     bullets: [
       "Find patterns in your experiences you can't see yet",
       "Map what energised you and what drained you to careers that fit",
     ],
-    bg: "#53D88B",
+    bg: "#F5C423",
   },
 ];
 
@@ -249,7 +262,7 @@ const WelcomeScreen = ({ onStageSelect, savedSession, onContinueSession, onSignO
 
           <div className="flex flex-col items-center">
             {STAGES.map((stage, idx) => (
-              <div key={stage.id} className="w-full flex flex-col items-center">
+              <div key={`${stage.id}-${idx}`} className="w-full flex flex-col items-center">
                 {/* Card */}
                 <div
                   className="w-full max-w-xl rounded-2xl p-10 md:p-12 flex flex-col transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-xl"

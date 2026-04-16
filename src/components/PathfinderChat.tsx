@@ -5,6 +5,7 @@ import IndustryConstellation from "./IndustryConstellation";
 import WelcomeScreen from "./WelcomeScreen";
 import StageBadge, { type Stage } from "./StageBadge";
 import ActionPlanCard, { type ActionPlan } from "./ActionPlanCard";
+import RoadmapCard, { type Roadmap } from "./RoadmapCard";
 import SaveProgressPrompt from "./SaveProgressPrompt";
 import ProgressSavedToast from "./ProgressSavedToast";
 import ProgressSidebar from "./ProgressSidebar";
@@ -19,6 +20,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   showConstellation?: boolean;
+  roadmaps?: Roadmap[];
 }
 
 const STAGE_REGEX = /^\[STAGE:(Explore|Plan|Build|Reflect)\]\s*/;
@@ -29,9 +31,45 @@ const STAGE_REGEX = /^\[STAGE:(Explore|Plan|Build|Reflect)\]\s*/;
 const ACTION_PLAN_REGEX = /\[ACTION_PLAN:\s*(\{[\s\S]*?\})\]/g;
 /** Strip from UI always; constellation UI only toggles on first trigger in this session. */
 const SHOW_CONSTELLATION_RE = /\[SHOW_CONSTELLATION\]\s*/g;
+const SHOW_ROADMAP_RE = /\[SHOW_ROADMAP:\s*(\{[\s\S]*?\})\]/g;
+const ROADMAP_PLACEHOLDER_RE = /\[\[ROADMAP:(\d+)\]\]/g;
 
 function stripShowConstellationTag(text: string): string {
   return text.replace(SHOW_CONSTELLATION_RE, "").trim();
+}
+
+function renderAssistantContent(msg: ChatMessage) {
+  const raw = stripShowConstellationTag(msg.content);
+  const roadmaps = msg.roadmaps ?? [];
+
+  if (roadmaps.length === 0 || !ROADMAP_PLACEHOLDER_RE.test(raw)) {
+    // Reset regex state because we use /g above
+    ROADMAP_PLACEHOLDER_RE.lastIndex = 0;
+    return <ReactMarkdown>{raw}</ReactMarkdown>;
+  }
+
+  ROADMAP_PLACEHOLDER_RE.lastIndex = 0;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of raw.matchAll(ROADMAP_PLACEHOLDER_RE)) {
+    const idx = Number(match[1]);
+    const start = match.index ?? 0;
+    const before = raw.slice(lastIndex, start);
+    if (before.trim()) {
+      parts.push(<ReactMarkdown key={`md-${parts.length}`}>{before}</ReactMarkdown>);
+    } else if (before.length > 0) {
+      parts.push(<ReactMarkdown key={`md-${parts.length}`}>{before}</ReactMarkdown>);
+    }
+    if (roadmaps[idx]) {
+      parts.push(<RoadmapCard key={`rm-${idx}`} roadmap={roadmaps[idx]} />);
+    }
+    lastIndex = start + match[0].length;
+  }
+  const tail = raw.slice(lastIndex);
+  if (tail.trim() || tail.length > 0) {
+    parts.push(<ReactMarkdown key={`md-${parts.length}`}>{tail}</ReactMarkdown>);
+  }
+  return <>{parts}</>;
 }
 
 const PathfinderChat = () => {
@@ -207,6 +245,26 @@ const PathfinderChat = () => {
                 }
               }
 
+              // Inline roadmap tag parsing: replace tag with placeholder and store parsed payload
+              let roadmaps: Roadmap[] | undefined;
+              if (SHOW_ROADMAP_RE.test(display)) {
+                SHOW_ROADMAP_RE.lastIndex = 0;
+                roadmaps = [];
+                let roadmapIndex = 0;
+                display = display.replace(SHOW_ROADMAP_RE, (_full, jsonPayload: string) => {
+                  try {
+                    const parsed = JSON.parse(jsonPayload) as Roadmap;
+                    roadmaps!.push(parsed);
+                    const placeholder = `[[ROADMAP:${roadmapIndex}]]`;
+                    roadmapIndex += 1;
+                    return placeholder;
+                  } catch {
+                    return "";
+                  }
+                });
+              }
+              SHOW_ROADMAP_RE.lastIndex = 0;
+
               const actionPlanMatches = [...display.matchAll(ACTION_PLAN_REGEX)];
               if (actionPlanMatches.length > 0) {
                 try {
@@ -227,6 +285,7 @@ const PathfinderChat = () => {
                   role: "assistant",
                   content: display,
                   showConstellation: showConst,
+                  roadmaps,
                 };
                 return updated;
               });
@@ -498,7 +557,7 @@ const PathfinderChat = () => {
               >
                 {msg.role === "assistant" ? (
                   <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                    <ReactMarkdown>{stripShowConstellationTag(msg.content)}</ReactMarkdown>
+                    {renderAssistantContent(msg)}
                   </div>
                 ) : (
                   msg.content
