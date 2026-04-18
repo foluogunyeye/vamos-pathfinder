@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import IndustryConstellation from "./IndustryConstellation";
 import WelcomeScreen from "./WelcomeScreen";
 import StageBadge, { type Stage } from "./StageBadge";
@@ -72,8 +72,19 @@ function renderAssistantContent(msg: ChatMessage) {
   return <>{parts}</>;
 }
 
+function stageToUrlSlug(stage: Stage): string {
+  const map: Record<Stage, string> = {
+    Explore: "explore",
+    Plan: "plan",
+    Build: "build",
+    Reflect: "reflect",
+  };
+  return map[stage] ?? "explore";
+}
+
 const PathfinderChat = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -442,8 +453,9 @@ const PathfinderChat = () => {
       };
 
       void startChat();
+      navigate(`/pathfinder?stage=${encodeURIComponent(stageId)}`, { replace: true });
     },
-    [sendMessages, user, saveProgress, loadProgress]
+    [sendMessages, user, saveProgress, loadProgress, navigate]
   );
 
   // Deep link: /pathfinder?stage=explore|plan|planbuild|build|reflect
@@ -479,7 +491,11 @@ const PathfinderChat = () => {
     setConstellationShown(savedProgressData.conversation_history.some(m => m.showConstellation));
     setActionPlanCount(savedProgressData.action_plan ? 1 : 0);
     constellationEligibleRef.current = savedProgressData.current_stage === "Explore";
-  }, [savedProgressData]);
+    navigate(
+      `/pathfinder?stage=${encodeURIComponent(stageToUrlSlug(savedProgressData.current_stage as Stage))}`,
+      { replace: true }
+    );
+  }, [savedProgressData, navigate]);
 
   const handleMagicLinkSubmit = useCallback(async (email: string) => {
     return signInWithMagicLink(email);
@@ -492,6 +508,7 @@ const PathfinderChat = () => {
   }, []);
 
   const handleReset = useCallback(() => {
+    autoStartRef.current = false;
     setMessages([]);
     setConstellationShown(false);
     setInput("");
@@ -506,12 +523,20 @@ const PathfinderChat = () => {
     setShowSaveAfterActionPlan(false);
     setHighlightClusterId(null);
     setActionPlanOffered(false);
-  }, []);
+    navigate("/pathfinder", { replace: true });
+  }, [navigate]);
+
+  // /pathfinder/welcome is a stable alias for the stage selector; normalize to /pathfinder and reset session state.
+  useLayoutEffect(() => {
+    const p = location.pathname.replace(/\/$/, "") || "/";
+    if (p === "/pathfinder/welcome") {
+      handleReset();
+    }
+  }, [location.pathname, handleReset]);
 
   if (!started) {
     return (
       <WelcomeScreen
-        onStageSelect={handleStageSelect}
         savedSession={savedSession}
         onContinueSession={handleContinueSession}
         onSignOut={signOut}

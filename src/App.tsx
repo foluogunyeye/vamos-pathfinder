@@ -19,6 +19,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* Explicit stage-selector entry (alias); /pathfinder without ?stage= also shows WelcomeScreen */}
+            <Route path="/pathfinder/welcome" element={<PathfinderChat />} />
             <Route path="/pathfinder" element={<PathfinderChat />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

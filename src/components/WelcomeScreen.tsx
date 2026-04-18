@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ChevronRight, MapPin } from "lucide-react";
 import vamosSrc from "@/assets/vamos_logo_SQUARE.png";
 
@@ -132,7 +133,8 @@ interface SavedSessionSummary {
 }
 
 interface WelcomeScreenProps {
-  onStageSelect: (stageId: string, stageTitle: string) => void;
+  /** @deprecated Use /pathfinder?stage=… links; kept for tests only */
+  onStageSelect?: (stageId: string, stageTitle: string) => void;
   savedSession?: SavedSessionSummary | null;
   onContinueSession?: () => void;
   onSignOut?: () => void;
@@ -287,13 +289,24 @@ const WelcomeScreen = ({ onStageSelect, savedSession, onContinueSession, onSignO
                       </li>
                     ))}
                   </ul>
-                  <button
-                    onClick={() => onStageSelect(stage.id, stage.title)}
-                    className="self-start inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-base font-bold cursor-pointer border-2 border-white text-white bg-transparent transition-all duration-150 hover:bg-white/20 active:scale-95"
-                  >
-                    Start here
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
+                  {onStageSelect ? (
+                    <button
+                      type="button"
+                      onClick={() => onStageSelect(stage.id, stage.title)}
+                      className="self-start inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-base font-bold cursor-pointer border-2 border-white text-white bg-transparent transition-all duration-150 hover:bg-white/20 active:scale-95"
+                    >
+                      Start here
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <Link
+                      to={`/pathfinder?stage=${encodeURIComponent(stage.id)}`}
+                      className="self-start inline-flex items-center gap-1.5 rounded-full px-6 py-3 text-base font-bold cursor-pointer border-2 border-white text-white bg-transparent transition-all duration-150 hover:bg-white/20 active:scale-95 no-underline"
+                    >
+                      Start here
+                      <ChevronRight className="w-5 h-5" />
+                    </Link>
+                  )}
                 </div>
 
                 {/* Road between cards */}

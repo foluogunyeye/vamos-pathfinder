@@ -41,7 +41,7 @@ export default function Landing() {
           </Link>
 
           <Button asChild variant="secondary" className="rounded-full">
-            <Link to="/pathfinder?stage=explore">Try Pathfinder</Link>
+            <Link to="/pathfinder">Try Pathfinder</Link>
           </Button>
         </div>
       </header>
@@ -61,7 +61,7 @@ export default function Landing() {
 
             <div className="flex flex-col gap-3">
               <Button asChild className="w-fit rounded-full px-6">
-                <Link to="/pathfinder?stage=explore">Start exploring with Pathfinder</Link>
+                <Link to="/pathfinder">Start exploring with Pathfinder</Link>
               </Button>
               <p className="text-sm text-muted-foreground">
                 Includes an interactive career map and personalised action plan.
@@ -108,7 +108,7 @@ export default function Landing() {
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button asChild variant="secondary" className="rounded-full">
-                  <Link to="/pathfinder?stage=explore">Open Pathfinder</Link>
+                  <Link to="/pathfinder">Open Pathfinder</Link>
                 </Button>
                 <span className="text-sm text-muted-foreground">
                   Explore, then plan and build from there.
