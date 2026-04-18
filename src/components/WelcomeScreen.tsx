@@ -21,7 +21,7 @@ const STAGES: StageData[] = [
     bg: "#53D88B",
   },
   {
-    id: "planbuild",
+    id: "plan",
     title: "Plan",
     quote:
       "I have a direction in mind (like a field, a role, or a type of work) but I'm not sure what the path from here actually looks like or where to start.",
@@ -32,7 +32,7 @@ const STAGES: StageData[] = [
     bg: "#F5C423",
   },
   {
-    id: "planbuild",
+    id: "build",
     title: "Build",
     quote:
       "I know the job or field I'm working toward. I want to figure out what experiences, skills, and opportunities I should be going after to become a strong candidate.",

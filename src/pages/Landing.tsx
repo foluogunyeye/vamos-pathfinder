@@ -4,18 +4,22 @@ import vamosLogo from "@/assets/vamos_logo.png";
 
 const STAGES = [
   {
+    slug: "explore" as const,
     title: "Explore",
     description: "Discover pathways you have not considered yet and build clarity from curiosity.",
   },
   {
+    slug: "plan" as const,
     title: "Plan",
     description: "Turn a direction into a practical roadmap, with next steps that fit your semester.",
   },
   {
+    slug: "build" as const,
     title: "Build",
     description: "Get specific ideas for experiences, projects, and skills that open real options.",
   },
   {
+    slug: "reflect" as const,
     title: "Reflect",
     description: "Make sense of what you have tried, spot patterns, and refine what matters to you.",
   },
@@ -73,13 +77,18 @@ export default function Landing() {
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {STAGES.map((stage) => (
-                  <div key={stage.title} className="rounded-2xl border border-border bg-background p-4">
+                  <Link
+                    key={stage.slug}
+                    to={`/pathfinder?stage=${stage.slug}`}
+                    className="block rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-primary" aria-hidden />
                       <div className="font-medium">{stage.title}</div>
                     </div>
                     <p className="mt-2 text-sm text-muted-foreground">{stage.description}</p>
-                  </div>
+                    <span className="mt-3 inline-block text-sm font-medium text-primary">Open Pathfinder →</span>
+                  </Link>
                 ))}
               </div>
             </div>

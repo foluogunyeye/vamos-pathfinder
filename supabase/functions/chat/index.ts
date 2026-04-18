@@ -5,18 +5,24 @@ const corsHeaders: Record<string, string> = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `<absolute_rules>
+const ABSOLUTE_RULES = `<absolute_rules>
 Never use em dashes (—) under any circumstances. Restructure the sentence or use a comma instead.
 Never use the word "honestly" or any phrase that implies you are a human speaking from personal experience.
 Never repeat the same reassurance, sentence opener, or phrase twice in a conversation.
 No bullet lists in opening responses.
-</absolute_rules>
+</absolute_rules>`;
 
+const FIRST_ASSISTANT_CLOSING_EXPLORE = `
 First assistant message only — required closing line: On your very first assistant message in this conversation only, after your normal opening (same tone, structure, and pacing you would already use), end the message with this exact sentence, verbatim, as the final sentence:
 "By the end of our conversation, I'll generate your Industry Constellation and a personalised action plan tailored to you."
-Do not add this sentence to any second or later assistant message. Do not paraphrase it. Do not repeat it in the conversation.
+Do not add this sentence to any second or later assistant message. Do not paraphrase it. Do not repeat it in the conversation.`;
 
-Once Pathfinder has gathered enough context (typically by turn 3-4) and has identified a clear direction or next steps, it MUST output the action plan tag in that same message, embedded after the conversational text. Use this EXACT format:
+const FIRST_ASSISTANT_CLOSING_NON_EXPLORE = `
+First assistant message only — required closing line: On your very first assistant message in this conversation only, after your normal opening (same tone, structure, and pacing you would already use), end the message with this exact sentence, verbatim, as the final sentence:
+"By the end of our conversation, I'll help you with a personalised action plan tailored to your situation."
+Do not add this sentence to any second or later assistant message. Do not paraphrase it. Do not repeat it in the conversation.`;
+
+const SYSTEM_PROMPT_BODY = `Once Pathfinder has gathered enough context (typically by turn 3-4) and has identified a clear direction or next steps, it MUST output the action plan tag in that same message, embedded after the conversational text. Use this EXACT format:
 [ACTION_PLAN: {"title": "Your Action Plan", "steps": [{"title": "Step title", "description": "What to do and why", "timeline": "this week / this month / this semester"}, {"title": "Step 2", "description": "...", "timeline": "..."}, {"title": "Step 3", "description": "...", "timeline": "..."}]}]
 Include 3-5 steps, specific to the student's situation. The tag must appear in the message — not described in prose, not promised again. If Pathfinder has already given directional advice and hasn't yet output the tag, it should output it in the very next response.
 
@@ -363,13 +369,23 @@ Language
 
 Always use American English spelling and vocabulary (e.g. "organize" not "organise", "program" not "programme", "college" not "university" where appropriate, "resume" not "CV"). The only exception is when speaking to a student who has indicated they are in the UK, in which case use British English.`;
 
+function buildCoreSystemPrompt(constellationEligible: boolean): string {
+  const firstClosing = constellationEligible
+    ? FIRST_ASSISTANT_CLOSING_EXPLORE
+    : FIRST_ASSISTANT_CLOSING_NON_EXPLORE;
+  return `${ABSOLUTE_RULES}${firstClosing}
+
+${SYSTEM_PROMPT_BODY}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { messages, stageContext, exploredClustersCount, actionPlanOffered } = await req.json();
+    const { messages, stageContext, exploredClustersCount, actionPlanOffered, constellationEligible } =
+      await req.json();
 
     if (!Array.isArray(messages)) {
       return new Response(
@@ -377,6 +393,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const includeConstellationInSystemPrompt = constellationEligible !== false;
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
@@ -400,7 +418,9 @@ Deno.serve(async (req) => {
         system: [
           {
             type: "text",
-            text: (stageContext ? `${SYSTEM_PROMPT}\n\n${stageContext}` : SYSTEM_PROMPT)
+            text: (stageContext
+              ? `${buildCoreSystemPrompt(includeConstellationInSystemPrompt)}\n\n${stageContext}`
+              : buildCoreSystemPrompt(includeConstellationInSystemPrompt))
               + `\n\nCurrent session context: The student has explored ${exploredClustersCount || 0} constellation cluster(s) so far.${actionPlanOffered ? ' An action plan suggestion has already been offered in this conversation, so do NOT offer one again.' : ''}`,
             cache_control: { type: "ephemeral" },
           },

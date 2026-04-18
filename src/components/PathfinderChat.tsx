@@ -107,6 +107,8 @@ const PathfinderChat = () => {
   const { saveProgress, loadProgress } = useProgressSave(user);
 
   const autoStartRef = useRef(false);
+  /** True only for Explore journeys; passed to the chat API so non-Explore stages never get constellation UX. */
+  const constellationEligibleRef = useRef(false);
 
   // Load saved progress on auth
   useEffect(() => {
@@ -201,6 +203,7 @@ const PathfinderChat = () => {
           stageContext: ctx,
           exploredClustersCount: exploredCount,
           actionPlanOffered,
+          constellationEligible: constellationEligibleRef.current,
         }),
       });
 
@@ -245,10 +248,14 @@ const PathfinderChat = () => {
                 display = display.replace(STAGE_REGEX, "");
               }
 
+              if (!constellationEligibleRef.current) {
+                display = display.replace(SHOW_CONSTELLATION_RE, "").trim();
+              }
+
               {
                 const beforeConstellationStrip = display;
                 display = display.replace(SHOW_CONSTELLATION_RE, "").trim();
-                if (beforeConstellationStrip !== display && !constellationShown) {
+                if (beforeConstellationStrip !== display) {
                   showConst = true;
                   setConstellationShown(true);
                 }
@@ -300,10 +307,11 @@ const PathfinderChat = () => {
 
               setMessages((prev) => {
                 const updated = [...prev];
+                const prevLast = updated[updated.length - 1];
                 updated[updated.length - 1] = {
                   role: "assistant",
                   content: display,
-                  showConstellation: showConst,
+                  showConstellation: showConst || prevLast?.showConstellation === true,
                   roadmaps,
                 };
                 return updated;
@@ -323,7 +331,7 @@ const PathfinderChat = () => {
       setIsStreaming(false);
     }
   },
-    [constellationShown, stageContext, exploredClusters, actionPlanOffered]
+    [stageContext, exploredClusters, actionPlanOffered]
   );
 
   const handleSend = useCallback(
@@ -366,13 +374,29 @@ const PathfinderChat = () => {
   };
 
   const handleStageSelect = useCallback(
-    (stageId: string, stageTitle: string) => {
-      const stagePrompts: Record<string, string> = {
-        explore: `The student is in the Explore stage. They resonated with: "I don't really know what I want to do with my life". Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Hey! So you're figuring things out, and that's a great place to start. Most people who end up in interesting careers didn't have a plan at your stage, they had curiosity. Let's start there. What are you studying, and what kinds of things do you actually enjoy doing, in or outside of uni?"`,
-        planbuild: `The student is in the Plan stage. They have some direction and need both a roadmap and practical experience-building guidance. Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "OK so you've got some direction, that's more than most people give themselves credit for. Tell me what you're thinking and where you are in your degree, and I'll help you figure out what to actually do next and what experiences to start building."`,
-        reflect: `The student is in the Reflect stage. They resonated with: "I've done stuff but I still feel lost". Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Sometimes the best way forward is to look back at what you've already done. Tell me about the experiences you've had so far, work, uni, volunteering, whatever, and what stood out to you. Good or bad, both are useful."`,
+    (stageId: string, _stageTitle: string) => {
+      const planCtx =
+        `The student is in the Plan stage. They have some direction and need both a roadmap and practical experience-building guidance. Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "OK so you've got some direction, that's more than most people give themselves credit for. Tell me what you're thinking and where you are in your degree, and I'll help you figure out what to actually do next and what experiences to start building."`;
+      const buildCtx =
+        `The student is in the Build stage. They know the job or field they're working toward and want guidance on experiences, skills, and opportunities to become a strong candidate. Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Let's tighten up your path from here. What role or field are you aiming for, and what have you done so far toward it? I'll help you figure out which experiences and skills to prioritize next."`;
+      const stagePrompts: Record<string, { ctx: string; badge: Stage }> = {
+        explore: {
+          ctx: `The student is in the Explore stage. They resonated with: "I don't really know what I want to do with my life". Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Hey! So you're figuring things out, and that's a great place to start. Most people who end up in interesting careers didn't have a plan at your stage, they had curiosity. Let's start there. What are you studying, and what kinds of things do you actually enjoy doing, in or outside of uni?"`,
+          badge: "Explore",
+        },
+        plan: { ctx: planCtx, badge: "Plan" },
+        planbuild: { ctx: planCtx, badge: "Plan" },
+        build: { ctx: buildCtx, badge: "Build" },
+        reflect: {
+          ctx: `The student is in the Reflect stage. They resonated with: "I've done stuff but I still feel lost". Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Sometimes the best way forward is to look back at what you've already done. Tell me about the experiences you've had so far, work, uni, volunteering, whatever, and what stood out to you. Good or bad, both are useful."`,
+          badge: "Reflect",
+        },
       };
-      const ctx = stagePrompts[stageId] || stagePrompts.explore;
+      const resolved =
+        stagePrompts[stageId] ?? stagePrompts.explore;
+      const ctx = resolved.ctx;
+      const badgeStage = resolved.badge;
+      constellationEligibleRef.current = stageId === "explore";
       const newConversationId = crypto.randomUUID();
       setConversationId(newConversationId);
       setStageContext(ctx);
@@ -384,7 +408,7 @@ const PathfinderChat = () => {
       setConstellationShown(false);
       setShowSaveAfterConstellation(false);
       setShowSaveAfterActionPlan(false);
-      setCurrentStage(stageTitle as Stage);
+      setCurrentStage(badgeStage);
       setActionPlanOffered(false);
 
       const startChat = async () => {
@@ -394,7 +418,7 @@ const PathfinderChat = () => {
             explored_clusters: [],
             conversation_history: [],
             action_plan: null,
-            current_stage: stageTitle,
+            current_stage: badgeStage,
             stage_context: ctx,
             selected_cluster_id: null,
           });
@@ -422,7 +446,7 @@ const PathfinderChat = () => {
     [sendMessages, user, saveProgress, loadProgress]
   );
 
-  // Deep link: /pathfinder?stage=explore|planbuild|reflect
+  // Deep link: /pathfinder?stage=explore|plan|planbuild|build|reflect
   // Starts the chosen flow once, then falls back to normal UI behavior.
   useEffect(() => {
     if (autoStartRef.current) return;
@@ -433,20 +457,11 @@ const PathfinderChat = () => {
     if (!stage) return;
 
     const stageId = stage.toLowerCase();
-    if (stageId === "explore") {
-      autoStartRef.current = true;
-      handleStageSelect("explore", "Explore");
-      return;
-    }
-    if (stageId === "planbuild") {
-      autoStartRef.current = true;
-      handleStageSelect("planbuild", "Plan");
-      return;
-    }
-    if (stageId === "reflect") {
-      autoStartRef.current = true;
-      handleStageSelect("reflect", "Reflect");
-    }
+    const allowed = new Set(["explore", "plan", "planbuild", "build", "reflect"]);
+    if (!allowed.has(stageId)) return;
+
+    autoStartRef.current = true;
+    handleStageSelect(stageId, "");
   }, [location.search, started, authLoading, handleStageSelect]);
 
   const handleContinueSession = useCallback(() => {
@@ -463,6 +478,7 @@ const PathfinderChat = () => {
     setSelectedClusterId(savedProgressData.selected_cluster_id);
     setConstellationShown(savedProgressData.conversation_history.some(m => m.showConstellation));
     setActionPlanCount(savedProgressData.action_plan ? 1 : 0);
+    constellationEligibleRef.current = savedProgressData.current_stage === "Explore";
   }, [savedProgressData]);
 
   const handleMagicLinkSubmit = useCallback(async (email: string) => {
