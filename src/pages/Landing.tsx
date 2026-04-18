@@ -79,7 +79,7 @@ export default function Landing() {
                 {STAGES.map((stage) => (
                   <Link
                     key={stage.slug}
-                    to={`/pathfinder?stage=${stage.slug}`}
+                    to={`/pathfinder?stage=${encodeURIComponent(stage.slug)}`}
                     className="block rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-center gap-2">

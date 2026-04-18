@@ -25,10 +25,60 @@ interface ChatMessage {
 
 const STAGE_REGEX = /^\[STAGE:(Explore|Plan|Build|Reflect)\]\s*/;
 /**
- * Extract action plan JSON anywhere in the message.
- * Not anchored to end because the model sometimes appends trailing text/newlines.
+ * Extract [ACTION_PLAN: {...}] tags with brace matching (non-greedy regex breaks on nested JSON).
  */
-const ACTION_PLAN_REGEX = /\[ACTION_PLAN:\s*(\{[\s\S]*?\})\]/g;
+function forEachActionPlanTag(
+  text: string,
+  onTag: (payload: { jsonStr: string; start: number; end: number }) => void
+) {
+  const marker = "[ACTION_PLAN:";
+  let search = 0;
+  while (search < text.length) {
+    const i = text.indexOf(marker, search);
+    if (i === -1) break;
+    let p = i + marker.length;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    if (p >= text.length || text[p] !== "{") {
+      search = i + marker.length;
+      continue;
+    }
+    const jsonStart = p;
+    let depth = 0;
+    let q = jsonStart;
+    for (; q < text.length; q++) {
+      const c = text[q];
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) {
+          q++;
+          break;
+        }
+      }
+    }
+    if (depth !== 0) {
+      search = i + 1;
+      continue;
+    }
+    const jsonStr = text.slice(jsonStart, q);
+    let end = q;
+    while (end < text.length && /\s/.test(text[end])) end++;
+    if (text[end] === "]") end++;
+    onTag({ jsonStr, start: i, end });
+    search = end;
+  }
+}
+
+function stripActionPlanTags(text: string): string {
+  const spans: { start: number; end: number }[] = [];
+  forEachActionPlanTag(text, ({ start, end }) => spans.push({ start, end }));
+  let out = text;
+  for (let k = spans.length - 1; k >= 0; k--) {
+    const { start, end } = spans[k];
+    out = out.slice(0, start) + out.slice(end);
+  }
+  return out.trim();
+}
 /** Strip from UI always; constellation UI only toggles on first trigger in this session. */
 const SHOW_CONSTELLATION_RE = /\[SHOW_CONSTELLATION\]\s*/g;
 const SHOW_ROADMAP_RE = /\[SHOW_ROADMAP:\s*(\{[\s\S]*?\})\]/g;
@@ -118,8 +168,22 @@ const PathfinderChat = () => {
   const { saveProgress, loadProgress } = useProgressSave(user);
 
   const autoStartRef = useRef(false);
+  /** Stage the student chose when starting this session (URL or saved progress); used to ignore wrong [STAGE:Plan] from the model on Build journeys. */
+  const sessionEntryStageRef = useRef<Stage | null>(null);
   /** True only for Explore journeys; passed to the chat API so non-Explore stages never get constellation UX. */
   const constellationEligibleRef = useRef(false);
+  /**
+   * Once the first [ACTION_PLAN: {...}] is successfully applied in this chat, ignore any later tags in the same
+   * conversation (state is only set once). Reset when starting a new chat or when loading a saved session.
+   */
+  const actionPlanConsumedForSessionRef = useRef(false);
+
+  /** Any time an action plan exists in state, treat the session as having consumed the first tag (guards against ref/parse edge cases). */
+  useEffect(() => {
+    if (actionPlan != null) {
+      actionPlanConsumedForSessionRef.current = true;
+    }
+  }, [actionPlan]);
 
   // Load saved progress on auth
   useEffect(() => {
@@ -255,7 +319,11 @@ const PathfinderChat = () => {
 
               const stageMatch = display.match(STAGE_REGEX);
               if (stageMatch) {
-                setCurrentStage(stageMatch[1] as Stage);
+                const incoming = stageMatch[1] as Stage;
+                // System prompt often maps "roadmap / action plan" to Plan; Build-entry sessions must stay Build for the badge and UX.
+                if (!(sessionEntryStageRef.current === "Build" && incoming === "Plan")) {
+                  setCurrentStage(incoming);
+                }
                 display = display.replace(STAGE_REGEX, "");
               }
 
@@ -292,28 +360,40 @@ const PathfinderChat = () => {
               }
               SHOW_ROADMAP_RE.lastIndex = 0;
 
-              const actionPlanMatches = [...display.matchAll(ACTION_PLAN_REGEX)];
-              if (actionPlanMatches.length > 0) {
-                try {
-                  const last = actionPlanMatches[actionPlanMatches.length - 1];
-                  const rawParsed = JSON.parse(last[1]) as any;
-                  const normalized: ActionPlan =
-                    rawParsed && Array.isArray(rawParsed.steps)
-                      ? {
-                          role: rawParsed.title ?? "Your Action Plan",
-                          keepExploring: [],
-                          startBuilding: [],
-                          stepsDetailed: rawParsed.steps,
-                          careersPrompt: "",
-                        }
-                      : (rawParsed as ActionPlan);
-                  setActionPlan(normalized);
-                  setActionPlanCount(prev => prev + 1);
-                  setActionPlanOffered(true);
-                } catch {
-                  // skip malformed
+              const actionPlanPayloads: { jsonStr: string }[] = [];
+              forEachActionPlanTag(display, ({ jsonStr }) => actionPlanPayloads.push({ jsonStr }));
+              if (actionPlanPayloads.length > 0) {
+                // First successful parse only; later tags are stripped from UI and ignored when already consumed.
+                if (!actionPlanConsumedForSessionRef.current) {
+                  try {
+                    const last = actionPlanPayloads[actionPlanPayloads.length - 1];
+                    const rawParsed = JSON.parse(last.jsonStr) as any;
+                    const normalized: ActionPlan =
+                      rawParsed && Array.isArray(rawParsed.steps)
+                        ? {
+                            role: rawParsed.title ?? "Your Action Plan",
+                            keepExploring: [],
+                            startBuilding: [],
+                            stepsDetailed: rawParsed.steps,
+                            careersPrompt: "",
+                          }
+                        : (rawParsed as ActionPlan);
+                    let appliedFirstPlan = false;
+                    setActionPlan((prev) => {
+                      if (prev != null) return prev;
+                      appliedFirstPlan = true;
+                      return normalized;
+                    });
+                    if (appliedFirstPlan) {
+                      actionPlanConsumedForSessionRef.current = true;
+                      setActionPlanCount((prev) => prev + 1);
+                      setActionPlanOffered(true);
+                    }
+                  } catch {
+                    /* JSON incomplete until more deltas arrive */
+                  }
                 }
-                display = display.replace(ACTION_PLAN_REGEX, "").trim();
+                display = stripActionPlanTags(display);
               }
 
               setMessages((prev) => {
@@ -407,6 +487,7 @@ const PathfinderChat = () => {
         stagePrompts[stageId] ?? stagePrompts.explore;
       const ctx = resolved.ctx;
       const badgeStage = resolved.badge;
+      sessionEntryStageRef.current = badgeStage;
       constellationEligibleRef.current = stageId === "explore";
       const newConversationId = crypto.randomUUID();
       setConversationId(newConversationId);
@@ -416,6 +497,7 @@ const PathfinderChat = () => {
       setExploredClusters([]);
       setActionPlan(null);
       setActionPlanCount(0);
+      actionPlanConsumedForSessionRef.current = false;
       setConstellationShown(false);
       setShowSaveAfterConstellation(false);
       setShowSaveAfterActionPlan(false);
@@ -490,6 +572,8 @@ const PathfinderChat = () => {
     setSelectedClusterId(savedProgressData.selected_cluster_id);
     setConstellationShown(savedProgressData.conversation_history.some(m => m.showConstellation));
     setActionPlanCount(savedProgressData.action_plan ? 1 : 0);
+    actionPlanConsumedForSessionRef.current = !!savedProgressData.action_plan;
+    sessionEntryStageRef.current = savedProgressData.current_stage as Stage;
     constellationEligibleRef.current = savedProgressData.current_stage === "Explore";
     navigate(
       `/pathfinder?stage=${encodeURIComponent(stageToUrlSlug(savedProgressData.current_stage as Stage))}`,
@@ -519,12 +603,24 @@ const PathfinderChat = () => {
     setExploredClusters([]);
     setActionPlan(null);
     setActionPlanCount(0);
+    actionPlanConsumedForSessionRef.current = false;
     setShowSaveAfterConstellation(false);
     setShowSaveAfterActionPlan(false);
     setHighlightClusterId(null);
     setActionPlanOffered(false);
+    sessionEntryStageRef.current = null;
     navigate("/pathfinder", { replace: true });
   }, [navigate]);
+
+  // Keep ?stage= in sync with the badge when the model updates [STAGE:...] or when continuing a session.
+  useEffect(() => {
+    if (!started) return;
+    const expected = stageToUrlSlug(currentStage).toLowerCase();
+    const cur = new URLSearchParams(location.search).get("stage")?.toLowerCase() ?? "";
+    if (cur !== expected) {
+      navigate(`/pathfinder?stage=${encodeURIComponent(expected)}`, { replace: true });
+    }
+  }, [started, currentStage, location.search, navigate]);
 
   // /pathfinder/welcome is a stable alias for the stage selector; normalize to /pathfinder and reset session state.
   useLayoutEffect(() => {
@@ -544,12 +640,6 @@ const PathfinderChat = () => {
       />
     );
   }
-
-  // Determine where to show save prompts
-  const constellationMessageIndex = messages.findIndex(m => m.showConstellation);
-  const lastAssistantWithActionPlan = actionPlan && !isStreaming
-    ? messages.length - 1
-    : -1;
 
   const showSidebar = !isMobile && started && constellationShown;
   const showJourneyRoadmap = !isMobile && started;
@@ -626,92 +716,99 @@ const PathfinderChat = () => {
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages (scroll) + action plan pinned above input — card stays out of overflow so it does not scroll away or reflow during streaming */}
       <div
-        ref={scrollRef}
-        style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        {messages.length === 0 && (
-          <p style={{ color: "#999", textAlign: "center", marginTop: 60, fontSize: 14 }}>
-            Start a conversation with Vamos Pathfinder
-          </p>
-        )}
+        <div
+          ref={scrollRef}
+          style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          {messages.length === 0 && (
+            <p style={{ color: "#999", textAlign: "center", marginTop: 60, fontSize: 14 }}>
+              Start a conversation with Vamos Pathfinder
+            </p>
+          )}
 
-        {messages.map((msg, i) => (
-          <div key={i}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
+          {messages.map((msg, i) => (
+            <div key={i}>
               <div
                 style={{
-                  background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
-                  color: msg.role === "user" ? "#fff" : "#222",
-                  padding: "12px 16px",
-                  borderRadius: 12,
-                  maxWidth: "85%",
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
+                  display: "flex",
+                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
                 }}
               >
-                {msg.role === "assistant" ? (
-                  <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                    {renderAssistantContent(msg)}
-                  </div>
-                ) : (
-                  msg.content
-                )}
+                <div
+                  style={{
+                    background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
+                    color: msg.role === "user" ? "#fff" : "#222",
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    maxWidth: "85%",
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                      {renderAssistantContent(msg)}
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
+              </div>
+
+              {msg.showConstellation && (
+                <div ref={constellationRef} style={{ margin: "12px 0" }}>
+                  <IndustryConstellation onClusterClick={handleClusterClick} highlightClusterId={highlightClusterId} />
+                </div>
+              )}
+
+              {/* Save prompt after constellation exploration */}
+              {msg.showConstellation && showSaveAfterConstellation && !user && !isStreaming && exploredClusters.length > 0 && (
+                <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
+              )}
+
+            </div>
+          ))}
+
+          {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
+            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+              <div
+                style={{
+                  background: "#F5F5F5",
+                  color: "#888",
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  fontSize: 14,
+                  fontStyle: "italic",
+                }}
+              >
+                Thinking...
               </div>
             </div>
+          )}
+        </div>
 
-            {msg.showConstellation && (
-              <div ref={constellationRef} style={{ margin: "12px 0" }}>
-                <IndustryConstellation onClusterClick={handleClusterClick} highlightClusterId={highlightClusterId} />
-              </div>
-            )}
-
-            {/* Save prompt after constellation exploration */}
-            {msg.showConstellation && showSaveAfterConstellation && !user && !isStreaming && exploredClusters.length > 0 && (
+        {actionPlan && (
+          <div style={{ flexShrink: 0, paddingTop: 8 }}>
+            <ActionPlanCard
+              plan={actionPlan}
+              isFirst={actionPlanCount <= 1}
+              connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
+              onExploreMore={() => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            />
+            {showSaveAfterActionPlan && !user && !isStreaming && (
               <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
             )}
-
-            {/* Show action plan card after the last assistant message */}
-            {msg.role === "assistant" && i === messages.length - 1 && actionPlan && !isStreaming && (
-              <>
-                <ActionPlanCard
-                  plan={actionPlan}
-                  isFirst={actionPlanCount <= 1}
-                  connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
-                  onExploreMore={() => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                />
-
-                {/* Save prompt after action plan */}
-                {showSaveAfterActionPlan && !user && (
-                  <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
-                )}
-              </>
-            )}
-          </div>
-        ))}
-
-        {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
-          <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <div
-              style={{
-                background: "#F5F5F5",
-                color: "#888",
-                padding: "12px 16px",
-                borderRadius: 12,
-                fontSize: 14,
-                fontStyle: "italic",
-              }}
-            >
-              Thinking...
-            </div>
           </div>
         )}
       </div>
