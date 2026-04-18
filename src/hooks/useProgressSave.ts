@@ -10,6 +10,7 @@ interface ChatMessage {
 }
 
 interface ProgressData {
+  conversation_id: string | null;
   explored_clusters: string[];
   conversation_history: ChatMessage[];
   action_plan: ActionPlan | null;
@@ -20,6 +21,7 @@ interface ProgressData {
 
 export interface SavedProgress {
   id: string;
+  conversation_id: string | null;
   explored_clusters: string[];
   conversation_history: ChatMessage[];
   action_plan: ActionPlan | null;
@@ -36,6 +38,7 @@ export function useProgressSave(user: User | null) {
 
       const payload = {
         user_id: user.id,
+        conversation_id: data.conversation_id,
         explored_clusters: data.explored_clusters,
         conversation_history: data.conversation_history as any,
         action_plan: data.action_plan as any,
@@ -72,6 +75,7 @@ export function useProgressSave(user: User | null) {
 
     return {
       id: data.id,
+      conversation_id: data.conversation_id ?? null,
       explored_clusters: data.explored_clusters ?? [],
       conversation_history: (data.conversation_history as any) ?? [],
       action_plan: (data.action_plan as any) ?? null,

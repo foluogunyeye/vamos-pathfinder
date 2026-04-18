@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           action_plan: Json | null
           conversation_history: Json | null
+          conversation_id: string | null
           created_at: string
           current_stage: string | null
           explored_clusters: string[] | null
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           action_plan?: Json | null
           conversation_history?: Json | null
+          conversation_id?: string | null
           created_at?: string
           current_stage?: string | null
           explored_clusters?: string[] | null
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           action_plan?: Json | null
           conversation_history?: Json | null
+          conversation_id?: string | null
           created_at?: string
           current_stage?: string | null
           explored_clusters?: string[] | null

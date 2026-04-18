@@ -6,6 +6,8 @@ interface ActionPlan {
   role: string;
   keepExploring: string[];
   startBuilding: string[];
+  title?: string;
+  stepsDetailed?: { title: string; description: string; timeline: string }[];
   // Legacy fields for backward compatibility
   steps?: string[];
   experience?: string;
@@ -32,7 +34,9 @@ const ActionPlanCard = ({ plan, isFirst = true, connectedClusters = [], onExplor
   // Normalize: support both new two-section format and legacy flat format
   const keepExploring = plan.keepExploring ?? [];
   const startBuilding = plan.startBuilding ?? [];
-  const isLegacy = keepExploring.length === 0 && startBuilding.length === 0;
+  const detailedSteps = plan.stepsDetailed ?? [];
+  const isDetailed = detailedSteps.length > 0;
+  const isLegacy = !isDetailed && keepExploring.length === 0 && startBuilding.length === 0;
   const legacySteps = plan.steps ?? [];
 
   const generatePDF = async () => {
@@ -296,7 +300,7 @@ const ActionPlanCard = ({ plan, isFirst = true, connectedClusters = [], onExplor
           <img src={vamosSrc} alt="Vamos" style={{ height: 32, objectFit: "contain" }} />
         </div>
 
-        {/* Target role heading */}
+        {/* Target role / title heading */}
         <h3
           style={{
             fontFamily: "'Secular One', sans-serif",
@@ -306,11 +310,66 @@ const ActionPlanCard = ({ plan, isFirst = true, connectedClusters = [], onExplor
             textAlign: "center",
           }}
         >
-          {plan.role}
+          {plan.role || plan.title || "Your Action Plan"}
         </h3>
 
         {/* Two-section or legacy layout */}
-        {isLegacy ? (
+        {isDetailed ? (
+          <div style={{ marginBottom: 16 }}>
+            {detailedSteps.map((s, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: "#FAFAFA",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 8,
+                  padding: "12px 14px",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <p
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "#222",
+                      margin: 0,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {s.title}
+                  </p>
+                  <span
+                    style={{
+                      fontFamily: "'Roboto', sans-serif",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#53D88B",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.4px",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {s.timeline}
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontFamily: "'Roboto', sans-serif",
+                    fontSize: 13,
+                    color: "#555",
+                    margin: "6px 0 0",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {s.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : isLegacy ? (
           <div style={{ marginBottom: 16 }}>
             {renderStepList(legacySteps.slice(0, 3))}
           </div>
@@ -366,39 +425,41 @@ const ActionPlanCard = ({ plan, isFirst = true, connectedClusters = [], onExplor
         )}
 
         {/* Careers service prompt box */}
-        <div
-          style={{
-            background: "#D3FFE3",
-            borderRadius: 8,
-            padding: "12px 14px",
-          }}
-        >
-          <p
+        {plan.careersPrompt ? (
+          <div
             style={{
-              fontFamily: "'Roboto', sans-serif",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#53D88B",
-              margin: "0 0 4px",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
+              background: "#D3FFE3",
+              borderRadius: 8,
+              padding: "12px 14px",
             }}
           >
-            Ask Your Careers Service
-          </p>
-          <p
-            style={{
-              fontFamily: "'Roboto', sans-serif",
-              fontSize: 13,
-              color: "#333",
-              margin: 0,
-              fontStyle: "italic",
-              lineHeight: 1.5,
-            }}
-          >
-            "{plan.careersPrompt}"
-          </p>
-        </div>
+            <p
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#53D88B",
+                margin: "0 0 4px",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              Ask Your Careers Service
+            </p>
+            <p
+              style={{
+                fontFamily: "'Roboto', sans-serif",
+                fontSize: 13,
+                color: "#333",
+                margin: 0,
+                fontStyle: "italic",
+                lineHeight: 1.5,
+              }}
+            >
+              "{plan.careersPrompt}"
+            </p>
+          </div>
+        ) : null}
 
         {/* Where else these skills lead */}
         {connectedClusters.length > 0 && (

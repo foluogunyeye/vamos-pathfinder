@@ -83,76 +83,76 @@ const ProgressSidebar = ({
         </div>
       </div>
 
-      {/* Explored clusters */}
-      <div style={{ marginBottom: 24 }}>
-        <p
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "1.5px",
-            color: "#aaa",
-            margin: "0 0 10px",
-          }}
-        >
-          Clusters Explored
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {CLUSTERS.map((cluster) => {
-            const visited = exploredClusters.includes(cluster.id);
-            const canNavigate = !visited && onClusterNavigate;
-            return (
-              <div
-                key={cluster.id}
-                onClick={() => canNavigate && onClusterNavigate(cluster.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  opacity: visited ? 1 : 0.4,
-                  transition: "opacity 0.3s",
-                  cursor: canNavigate ? "pointer" : "default",
-                }}
-                title={canNavigate ? `Jump to ${cluster.title} on the constellation` : undefined}
-              >
+      {/* Explored clusters — only for the current conversation once at least one cluster was opened */}
+      {exploredClusters.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              color: "#aaa",
+              margin: "0 0 10px",
+            }}
+          >
+            Clusters Explored
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {CLUSTERS.map((cluster) => {
+              const visited = exploredClusters.includes(cluster.id);
+              const canNavigate = !visited && onClusterNavigate;
+              return (
                 <div
+                  key={cluster.id}
+                  onClick={() => canNavigate && onClusterNavigate(cluster.id)}
                   style={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: visited ? "#53D88B" : "transparent",
-                    border: visited ? "none" : "1.5px solid #ccc",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    transition: "all 0.3s",
+                    gap: 8,
+                    opacity: visited ? 1 : 0.4,
+                    transition: "opacity 0.3s",
+                    cursor: canNavigate ? "pointer" : "default",
                   }}
+                  title={canNavigate ? `Jump to ${cluster.title} on the constellation` : undefined}
                 >
-                  {visited && <Check size={10} color="#fff" strokeWidth={3} />}
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: visited ? "#53D88B" : "transparent",
+                      border: visited ? "none" : "1.5px solid #ccc",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      transition: "all 0.3s",
+                    }}
+                  >
+                    {visited && <Check size={10} color="#fff" strokeWidth={3} />}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: visited ? "#333" : "#aaa",
+                      fontWeight: visited ? 500 : 400,
+                      transition: "color 0.3s",
+                      textDecoration: canNavigate ? "underline" : "none",
+                      textDecorationColor: canNavigate ? "#ccc" : undefined,
+                    }}
+                  >
+                    {cluster.title}
+                  </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: visited ? "#333" : "#aaa",
-                    fontWeight: visited ? 500 : 400,
-                    transition: "color 0.3s",
-                    textDecoration: canNavigate ? "underline" : "none",
-                    textDecorationColor: canNavigate ? "#ccc" : undefined,
-                  }}
-                >
-                  {cluster.title}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        {exploredClusters.length > 0 && (
+              );
+            })}
+          </div>
           <p style={{ fontSize: 11, color: "#aaa", margin: "8px 0 0" }}>
             {exploredClusters.length} of {CLUSTERS.length} explored
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Action plan summary */}
       {actionPlan && (

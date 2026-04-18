@@ -87,6 +87,8 @@ const PathfinderChat = () => {
   const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
   const [highlightClusterId, setHighlightClusterId] = useState<string | null>(null);
   const [exploredClusters, setExploredClusters] = useState<string[]>([]);
+  /** Server-backed session id; explored clusters belong to this conversation only. */
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSaveAfterConstellation, setShowSaveAfterConstellation] = useState(false);
   const [actionPlanOffered, setActionPlanOffered] = useState(false);
   const [showSaveAfterActionPlan, setShowSaveAfterActionPlan] = useState(false);
@@ -133,6 +135,7 @@ const PathfinderChat = () => {
   const doSave = useCallback(async () => {
     if (!user) return;
     const saved = await saveProgress({
+      conversation_id: conversationId,
       explored_clusters: exploredClusters,
       conversation_history: messages,
       action_plan: actionPlan,
@@ -141,7 +144,7 @@ const PathfinderChat = () => {
       selected_cluster_id: selectedClusterId,
     });
     if (saved) setShowSavedToast(true);
-  }, [user, saveProgress, exploredClusters, messages, actionPlan, currentStage, stageContext, selectedClusterId]);
+  }, [user, saveProgress, conversationId, exploredClusters, messages, actionPlan, currentStage, stageContext, selectedClusterId]);
 
   // Save after constellation shown (once user has clicked a cluster)
   useEffect(() => {
@@ -171,11 +174,17 @@ const PathfinderChat = () => {
     }
   }, [user, actionPlan, isStreaming]);
 
-  const sendMessages = useCallback(async (allMessages: ChatMessage[], ctxOverride?: string) => {
+  const sendMessages = useCallback(
+    async (
+      allMessages: ChatMessage[],
+      ctxOverride?: string,
+      opts?: { exploredClustersCount?: number }
+    ) => {
     setIsStreaming(true);
 
     const apiMessages = allMessages.map(({ role, content }) => ({ role, content }));
     const ctx = ctxOverride ?? stageContext;
+    const exploredCount = opts?.exploredClustersCount ?? exploredClusters.length;
 
     try {
       const baseUrl = getSupabaseUrl();
@@ -190,7 +199,7 @@ const PathfinderChat = () => {
         body: JSON.stringify({
           messages: apiMessages,
           stageContext: ctx,
-          exploredClustersCount: exploredClusters.length,
+          exploredClustersCount: exploredCount,
           actionPlanOffered,
         }),
       });
@@ -269,8 +278,18 @@ const PathfinderChat = () => {
               if (actionPlanMatches.length > 0) {
                 try {
                   const last = actionPlanMatches[actionPlanMatches.length - 1];
-                  const parsed = JSON.parse(last[1]) as ActionPlan;
-                  setActionPlan(parsed);
+                  const rawParsed = JSON.parse(last[1]) as any;
+                  const normalized: ActionPlan =
+                    rawParsed && Array.isArray(rawParsed.steps)
+                      ? {
+                          role: rawParsed.title ?? "Your Action Plan",
+                          keepExploring: [],
+                          startBuilding: [],
+                          stepsDetailed: rawParsed.steps,
+                          careersPrompt: "",
+                        }
+                      : (rawParsed as ActionPlan);
+                  setActionPlan(normalized);
                   setActionPlanCount(prev => prev + 1);
                   setActionPlanOffered(true);
                 } catch {
@@ -303,7 +322,9 @@ const PathfinderChat = () => {
     } finally {
       setIsStreaming(false);
     }
-  }, [constellationShown, stageContext, exploredClusters.length, actionPlanOffered]);
+  },
+    [constellationShown, stageContext, exploredClusters, actionPlanOffered]
+  );
 
   const handleSend = useCallback(
     (text?: string) => {
@@ -322,17 +343,19 @@ const PathfinderChat = () => {
   const handleClusterClick = useCallback(
     (clusterId: string, title: string) => {
       setSelectedClusterId(clusterId);
-      setExploredClusters((prev) => prev.includes(clusterId) ? prev : [...prev, clusterId]);
+      const willAdd = !exploredClusters.includes(clusterId);
+      const exploredCountForApi = willAdd ? exploredClusters.length + 1 : exploredClusters.length;
+      setExploredClusters((prev) => (prev.includes(clusterId) ? prev : [...prev, clusterId]));
       const msg = `I'm curious about ${title}. Tell me more about what that looks like for someone with my background.`;
       setInput("");
       const userMessage: ChatMessage = { role: "user", content: msg };
       setMessages((prev) => {
         const next = [...prev, userMessage];
-        sendMessages(next);
+        sendMessages(next, undefined, { exploredClustersCount: exploredCountForApi });
         return next;
       });
     },
-    [sendMessages]
+    [sendMessages, exploredClusters]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -350,6 +373,8 @@ const PathfinderChat = () => {
         reflect: `The student is in the Reflect stage. They resonated with: "I've done stuff but I still feel lost". Do not mention that they selected a stage. Start the conversation with EXACTLY this message (do not change the wording): "Sometimes the best way forward is to look back at what you've already done. Tell me about the experiences you've had so far, work, uni, volunteering, whatever, and what stood out to you. Good or bad, both are useful."`,
       };
       const ctx = stagePrompts[stageId] || stagePrompts.explore;
+      const newConversationId = crypto.randomUUID();
+      setConversationId(newConversationId);
       setStageContext(ctx);
       setStarted(true);
       setMessages([]);
@@ -360,9 +385,41 @@ const PathfinderChat = () => {
       setShowSaveAfterConstellation(false);
       setShowSaveAfterActionPlan(false);
       setCurrentStage(stageTitle as Stage);
-      sendMessages([], ctx);
+      setActionPlanOffered(false);
+
+      const startChat = async () => {
+        if (user) {
+          const ok = await saveProgress({
+            conversation_id: newConversationId,
+            explored_clusters: [],
+            conversation_history: [],
+            action_plan: null,
+            current_stage: stageTitle,
+            stage_context: ctx,
+            selected_cluster_id: null,
+          });
+          if (ok) {
+            const fresh = await loadProgress();
+            if (fresh) {
+              setSavedProgressData(fresh);
+              if (fresh.conversation_history.length > 0) {
+                setSavedSession({
+                  clustersExplored: fresh.explored_clusters.length,
+                  hasActionPlan: !!fresh.action_plan,
+                  lastUpdated: fresh.updated_at,
+                });
+              } else {
+                setSavedSession(null);
+              }
+            }
+          }
+        }
+        sendMessages([], ctx, { exploredClustersCount: 0 });
+      };
+
+      void startChat();
     },
-    [sendMessages]
+    [sendMessages, user, saveProgress, loadProgress]
   );
 
   // Deep link: /pathfinder?stage=explore|planbuild|reflect
@@ -395,6 +452,9 @@ const PathfinderChat = () => {
   const handleContinueSession = useCallback(() => {
     if (!savedProgressData) return;
     setStarted(true);
+    setConversationId(
+      savedProgressData.conversation_id ?? crypto.randomUUID()
+    );
     setMessages(savedProgressData.conversation_history);
     setExploredClusters(savedProgressData.explored_clusters);
     setActionPlan(savedProgressData.action_plan);
@@ -422,12 +482,14 @@ const PathfinderChat = () => {
     setStageContext(null);
     setStarted(false);
     setCurrentStage("Explore");
+    setConversationId(null);
     setExploredClusters([]);
     setActionPlan(null);
     setActionPlanCount(0);
     setShowSaveAfterConstellation(false);
     setShowSaveAfterActionPlan(false);
     setHighlightClusterId(null);
+    setActionPlanOffered(false);
   }, []);
 
   if (!started) {
