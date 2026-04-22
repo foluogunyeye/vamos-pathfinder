@@ -431,7 +431,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         // Large roadmap JSON can exceed typical defaults; keep output budget high to avoid truncated [SHOW_ROADMAP] payloads.
-        max_tokens: 32000,
+        max_tokens: 16000,
         stream: true,
         system: [
           {
