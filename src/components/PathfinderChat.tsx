@@ -788,6 +788,7 @@ const PathfinderChat = () => {
 
   const showSidebar = !isMobile && started && constellationShown;
   const showJourneyRoadmap = !isMobile && started;
+  const roadmapShown = messages.some((m) => (m.roadmaps?.length ?? 0) > 0);
 
   return (
     <div
@@ -803,7 +804,11 @@ const PathfinderChat = () => {
       }}
     >
       {showJourneyRoadmap && (
-        <JourneyRoadmap constellationShown={constellationShown} actionPlan={actionPlan} />
+        <JourneyRoadmap
+          constellationShown={constellationShown}
+          actionPlan={actionPlan}
+          roadmapShown={roadmapShown}
+        />
       )}
     <div
       style={{

@@ -1,9 +1,10 @@
-import { Check, Lock } from "lucide-react";
+import { Check } from "lucide-react";
 import type { ActionPlan } from "./ActionPlanCard";
 
 interface JourneyRoadmapProps {
   constellationShown: boolean;
   actionPlan: ActionPlan | null;
+  roadmapShown: boolean;
 }
 
 const PANEL_WIDTH = 240;
@@ -13,11 +14,9 @@ const NODE_SIZE = 30;
 /** Vertical dash passes through circle centre when nodes are right-aligned */
 const CONNECTOR_CENTER_X = ROAD_COL_WIDTH - NODE_SIZE / 2;
 const GREEN = "#53D88B";
-const GREY_FILL = "#9ca3af";
 const AMBER = "#F5C423";
 /** Navy vertical dashed connectors between journey nodes */
 const CONNECTOR_NAVY = "#1e3a5f";
-const MUTED = "#aaa";
 const TEXT = "#333";
 /** Horizontal space between circle nodes and Explore / Plan / Build / Reflect labels */
 const LABEL_ROW_GAP = 6;
@@ -25,9 +24,11 @@ const LABEL_ROW_GAP = 6;
 /**
  * Left rail: vertical dashed navy lines between nodes, paired with ProgressSidebar.
  */
-export default function JourneyRoadmap({ constellationShown, actionPlan }: JourneyRoadmapProps) {
+export default function JourneyRoadmap({ constellationShown, actionPlan, roadmapShown }: JourneyRoadmapProps) {
   const exploreComplete = constellationShown;
   const planComplete = !!actionPlan;
+  const buildComplete = roadmapShown && !!actionPlan;
+  const reflectComplete = roadmapShown && !!actionPlan;
 
   return (
     <div
@@ -91,7 +92,7 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
           >
             <ProgressNode complete={planComplete} />
           </div>
-          <LabelBlock title="Plan" complete={planComplete} detail="Action Plan" />
+          <LabelBlock title="Plan" complete={planComplete} />
         </div>
 
         <RoadConnector />
@@ -107,9 +108,9 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               alignItems: "center",
             }}
           >
-            <LockedNode />
+            <ProgressNode complete={buildComplete} />
           </div>
-          <LabelBlock title="Build" comingSoon />
+          <LabelBlock title="Build" complete={buildComplete} />
         </div>
 
         <RoadConnector />
@@ -125,9 +126,9 @@ export default function JourneyRoadmap({ constellationShown, actionPlan }: Journ
               alignItems: "center",
             }}
           >
-            <LockedNode />
+            <ProgressNode complete={reflectComplete} />
           </div>
-          <LabelBlock title="Reflect" comingSoon />
+          <LabelBlock title="Reflect" complete={reflectComplete} />
         </div>
       </div>
     </div>
@@ -138,24 +139,18 @@ function LabelBlock({
   title,
   complete,
   detail,
-  comingSoon,
 }: {
   title: string;
   complete?: boolean;
   detail?: string;
-  comingSoon?: boolean;
 }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: comingSoon ? MUTED : TEXT, lineHeight: 1.25 }}>{title}</div>
-      {comingSoon ? (
-        <div style={{ fontSize: 10, color: MUTED, marginTop: 3, lineHeight: 1.3 }}>Coming soon</div>
-      ) : (
-        complete &&
+      <div style={{ fontSize: 13, fontWeight: 600, color: TEXT, lineHeight: 1.25 }}>{title}</div>
+      {complete &&
         detail && (
           <div style={{ fontSize: 10, color: GREEN, marginTop: 3, fontWeight: 500, lineHeight: 1.3 }}>{detail}</div>
-        )
-      )}
+        )}
     </div>
   );
 }
@@ -184,26 +179,6 @@ function ProgressNode({ complete }: { complete: boolean }) {
           ?
         </span>
       )}
-    </div>
-  );
-}
-
-function LockedNode() {
-  return (
-    <div
-      style={{
-        width: NODE_SIZE,
-        height: NODE_SIZE,
-        borderRadius: "50%",
-        background: GREY_FILL,
-        boxSizing: "border-box",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <Lock size={13} strokeWidth={2.25} color="#ffffff" aria-hidden />
     </div>
   );
 }
