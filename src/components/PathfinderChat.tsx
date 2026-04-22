@@ -294,7 +294,7 @@ const PathfinderChat = () => {
   const { saveProgress, loadProgress } = useProgressSave(user);
 
   const autoStartRef = useRef(false);
-  /** Stage the student chose when starting this session (URL or saved progress); used to ignore wrong [STAGE:Plan] from the model on Build journeys. */
+  /** Stage the student chose when starting this session (URL or saved progress); used to ignore erroneous [STAGE:Plan] from the model on Build and Reflect journeys. */
   const sessionEntryStageRef = useRef<Stage | null>(null);
   /** True only for Explore journeys; passed to the chat API so non-Explore stages never get constellation UX. */
   const constellationEligibleRef = useRef(false);
@@ -446,8 +446,10 @@ const PathfinderChat = () => {
               const stageMatch = display.match(STAGE_REGEX);
               if (stageMatch) {
                 const incoming = stageMatch[1] as Stage;
-                // System prompt often maps "roadmap / action plan" to Plan; Build-entry sessions must stay Build for the badge and UX.
-                if (!(sessionEntryStageRef.current === "Build" && incoming === "Plan")) {
+                const entry = sessionEntryStageRef.current;
+                const ignorePlanDueToSessionEntry =
+                  incoming === "Plan" && (entry === "Build" || entry === "Reflect");
+                if (!ignorePlanDueToSessionEntry) {
                   setCurrentStage(incoming);
                 }
                 display = display.replace(STAGE_REGEX, "");
