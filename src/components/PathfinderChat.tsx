@@ -896,8 +896,10 @@ const PathfinderChat = () => {
                       plan={msg.actionPlan}
                       isFirst={actionPlanCount <= 1}
                       connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
-                      onExploreMore={() =>
-                        constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                      onExploreMore={
+                        constellationShown
+                          ? () => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                          : undefined
                       }
                     />
                   )}
