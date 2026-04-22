@@ -10,6 +10,8 @@ interface ProgressSidebarProps {
   actionPlan: ActionPlan | null;
   roadmapShown: boolean;
   roadmap: Roadmap | null;
+  timelineConfirmed: boolean;
+  sneqReviewed: boolean;
   isAuthenticated: boolean;
   onClusterNavigate?: (clusterId: string) => void;
 }
@@ -27,6 +29,8 @@ const ProgressSidebar = ({
   actionPlan,
   roadmapShown,
   roadmap,
+  timelineConfirmed,
+  sneqReviewed,
   isAuthenticated,
   onClusterNavigate,
 }: ProgressSidebarProps) => {
@@ -272,52 +276,51 @@ const ProgressSidebar = ({
             </div>
           )}
 
-          {/* Build/Reflect: roadmap then gated action plan */}
+          {/* Build/Reflect: checklist + summaries */}
           {(currentStage === "Build" || currentStage === "Reflect") && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <CheckboxRow label="Roadmap" checked={roadmapReady} />
-                {roadmapReady && (
-                  <div
-                    style={{
-                      background: "#F6FFFA",
-                      border: "1px solid #D3FFE3",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 4 }}>
-                      {roadmap?.goal ?? "Your direction"}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#555", lineHeight: 1.4 }}>
-                      {roadmapBreakdown ?? "Roadmap generated"}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <CheckboxRow label={currentStage === "Reflect" ? "Graduation timeline confirmed" : "Timeline confirmed"} checked={timelineConfirmed} />
+              <CheckboxRow label="SNEQ snapshot reviewed" checked={sneqReviewed} disabled={!roadmapReady} />
+              <CheckboxRow label="Milestone roadmap generated" checked={roadmapReady} />
+              <CheckboxRow label="Action plan generated" checked={actionPlanReady} disabled={!actionPlanGateOpen} />
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <CheckboxRow label="Action plan" checked={actionPlanReady} disabled={!actionPlanGateOpen} />
-                {actionPlanReady && (
-                  <div
-                    style={{
-                      background: "#F0FFF5",
-                      border: "1px solid #D3FFE3",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 6 }}>
-                      {actionPlan?.role ?? "Your direction"}
-                    </div>
-                    {planPreviewSteps.slice(0, 2).map((s, i) => (
-                      <div key={i} style={{ fontSize: 11, color: "#555", lineHeight: 1.4, marginTop: i === 0 ? 0 : 4 }}>
-                        {i + 1}. {s}
-                      </div>
-                    ))}
+              {roadmapReady && (
+                <div
+                  style={{
+                    background: "#F6FFFA",
+                    border: "1px solid #D3FFE3",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 4 }}>
+                    {roadmap?.goal ?? "Your direction"}
                   </div>
-                )}
-              </div>
+                  <div style={{ fontSize: 11, color: "#555", lineHeight: 1.4 }}>
+                    {roadmapBreakdown ?? "Roadmap generated"}
+                  </div>
+                </div>
+              )}
+
+              {actionPlanReady && (
+                <div
+                  style={{
+                    background: "#F0FFF5",
+                    border: "1px solid #D3FFE3",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 6 }}>
+                    {actionPlan?.role ?? "Your direction"}
+                  </div>
+                  {planPreviewSteps.slice(0, 2).map((s, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#555", lineHeight: 1.4, marginTop: i === 0 ? 0 : 4 }}>
+                      {i + 1}. {s}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

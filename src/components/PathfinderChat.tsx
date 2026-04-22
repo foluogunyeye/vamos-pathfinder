@@ -786,13 +786,34 @@ const PathfinderChat = () => {
     );
   }
 
-  const showSidebar = !isMobile && started && constellationShown;
+  const showSidebar = !isMobile && started;
   const showJourneyRoadmap = !isMobile && started;
   const roadmapShown = messages.some((m) => (m.roadmaps?.length ?? 0) > 0);
   const latestRoadmap =
     [...messages]
       .reverse()
       .find((m) => (m.roadmaps?.length ?? 0) > 0)?.roadmaps?.[0] ?? null;
+
+  const timelineConfirmed = messages
+    .filter((m) => m.role === "user")
+    .some((m) =>
+      /(graduate|graduation|class of|\b(first|second|third|fourth|final)[- ]year\b|\b(freshman|sophomore|junior|senior)\b|\b\d+\s*(weeks?|months?)\s*(to|until)\s*graduation\b|\bmay\b|\bdecember\b|\bspring\b|\bfall\b)/i.test(
+        m.content
+      )
+    );
+
+  const sneqReviewed = (() => {
+    // Consider SNEQ "reviewed" once a roadmap has been shown and the student has responded afterwards at least once.
+    let roadmapMessageIndex = -1;
+    for (let i = 0; i < messages.length; i++) {
+      if ((messages[i].roadmaps?.length ?? 0) > 0) {
+        roadmapMessageIndex = i;
+        break;
+      }
+    }
+    if (roadmapMessageIndex === -1) return false;
+    return messages.slice(roadmapMessageIndex + 1).some((m) => m.role === "user" && m.content.trim().length > 0);
+  })();
 
   return (
     <div
@@ -1037,6 +1058,8 @@ const PathfinderChat = () => {
           actionPlan={actionPlan}
           roadmapShown={roadmapShown}
           roadmap={latestRoadmap}
+          timelineConfirmed={timelineConfirmed}
+          sneqReviewed={sneqReviewed}
           isAuthenticated={!!user}
           onClusterNavigate={handleClusterNavigate}
         />
