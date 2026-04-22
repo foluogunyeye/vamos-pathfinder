@@ -505,30 +505,27 @@ const PathfinderChat = () => {
                             careersPrompt: "",
                           }
                         : (rawParsed as ActionPlan);
-                    let appliedFirstPlan = false;
-                    setActionPlan((prev) => {
-                      if (prev != null) return prev;
-                      appliedFirstPlan = true;
-                      return normalized;
+                    // Mark consumed immediately (state updaters are async; do not rely on local flags set inside them).
+                    actionPlanConsumedForSessionRef.current = true;
+                    setActionPlan((prev) => (prev != null ? prev : normalized));
+                    setActionPlanCount((prev) => prev + 1);
+                    setActionPlanOffered(true);
+
+                    // Inject an inline action plan message item immediately after the streaming assistant text message.
+                    setMessages((prev) => {
+                      if (prev.some((m) => m.type === "action_plan")) return prev;
+                      const next = [...prev];
+                      const idx = streamingMsgIndex >= 0 ? streamingMsgIndex : next.length - 1;
+                      const injected = {
+                        role: "assistant" as const,
+                        type: "action_plan" as const,
+                        content: "",
+                        actionPlan: normalized,
+                      };
+                      console.log("[PathfinderChat] injected action_plan message", { idx: idx + 1 });
+                      next.splice(idx + 1, 0, injected);
+                      return next;
                     });
-                    if (appliedFirstPlan) {
-                      actionPlanConsumedForSessionRef.current = true;
-                      setActionPlanCount((prev) => prev + 1);
-                      setActionPlanOffered(true);
-                      // Inject an inline action plan message item immediately after the streaming assistant text message.
-                      setMessages((prev) => {
-                        if (prev.some((m) => m.type === "action_plan")) return prev;
-                        const next = [...prev];
-                        const idx = streamingMsgIndex >= 0 ? streamingMsgIndex : next.length - 1;
-                        next.splice(idx + 1, 0, {
-                          role: "assistant",
-                          type: "action_plan",
-                          content: "",
-                          actionPlan: normalized,
-                        });
-                        return next;
-                      });
-                    }
                   } catch {
                     /* JSON incomplete until more deltas arrive */
                   }
