@@ -294,7 +294,7 @@ const PathfinderChat = () => {
   const { saveProgress, loadProgress } = useProgressSave(user);
 
   const autoStartRef = useRef(false);
-  /** Stage the student chose when starting this session (URL or saved progress); used to ignore erroneous [STAGE:Plan] from the model on Build and Reflect journeys. */
+  /** Stage the student chose when starting this session (URL or saved progress); used to ignore early [STAGE:Plan] noise on Build/Reflect (first two assistant replies only). */
   const sessionEntryStageRef = useRef<Stage | null>(null);
   /** True only for Explore journeys; passed to the chat API so non-Explore stages never get constellation UX. */
   const constellationEligibleRef = useRef(false);
@@ -385,6 +385,10 @@ const PathfinderChat = () => {
     ) => {
     setIsStreaming(true);
 
+    /** 1-based index of this assistant reply (opening message = 1). Used to ignore spurious [STAGE:Plan] early in Build/Reflect. */
+    const assistantTurnNumber =
+      allMessages.filter((m) => m.role === "assistant").length + 1;
+
     const apiMessages = allMessages.map(({ role, content }) => ({ role, content }));
     const ctx = ctxOverride ?? stageContext;
     const exploredCount = opts?.exploredClustersCount ?? exploredClusters.length;
@@ -447,9 +451,11 @@ const PathfinderChat = () => {
               if (stageMatch) {
                 const incoming = stageMatch[1] as Stage;
                 const entry = sessionEntryStageRef.current;
-                const ignorePlanDueToSessionEntry =
-                  incoming === "Plan" && (entry === "Build" || entry === "Reflect");
-                if (!ignorePlanDueToSessionEntry) {
+                const ignoreEarlyPlanInBuildOrReflect =
+                  incoming === "Plan" &&
+                  (entry === "Build" || entry === "Reflect") &&
+                  assistantTurnNumber <= 2;
+                if (!ignoreEarlyPlanInBuildOrReflect) {
                   setCurrentStage(incoming);
                 }
                 display = display.replace(STAGE_REGEX, "");
