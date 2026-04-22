@@ -79,9 +79,135 @@ function stripActionPlanTags(text: string): string {
   }
   return out.trim();
 }
+
+function forEachShowRoadmapTag(
+  text: string,
+  onTag: (payload: { jsonStr: string; start: number; end: number }) => void
+) {
+  const marker = "[SHOW_ROADMAP:";
+  let search = 0;
+  while (search < text.length) {
+    const i = text.indexOf(marker, search);
+    if (i === -1) break;
+    let p = i + marker.length;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    if (p >= text.length || text[p] !== "{") {
+      search = i + marker.length;
+      continue;
+    }
+    const jsonStart = p;
+    let depth = 0;
+    let q = jsonStart;
+    for (; q < text.length; q++) {
+      const c = text[q];
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) {
+          q++;
+          break;
+        }
+      }
+    }
+    if (depth !== 0) {
+      search = i + 1;
+      continue;
+    }
+    const jsonStr = text.slice(jsonStart, q);
+    let end = q;
+    while (end < text.length && /\s/.test(text[end])) end++;
+    if (text[end] === "]") end++;
+    onTag({ jsonStr, start: i, end });
+    search = end;
+  }
+}
+
+function stripShowRoadmapTags(text: string): string {
+  const spans: { start: number; end: number }[] = [];
+  forEachShowRoadmapTag(text, ({ start, end }) => spans.push({ start, end }));
+  let out = text;
+  for (let k = spans.length - 1; k >= 0; k--) {
+    const { start, end } = spans[k];
+    out = out.slice(0, start) + out.slice(end);
+  }
+  return out.trim();
+}
+
+/**
+ * Replace complete [SHOW_ROADMAP: {...}] with [[ROADMAP:n]]; if the first tag is incomplete (streaming), drop from its opening bracket onward.
+ */
+function replaceShowRoadmapTagsWithPlaceholders(text: string): { text: string; roadmaps: Roadmap[] } {
+  const roadmaps: Roadmap[] = [];
+  const marker = "[SHOW_ROADMAP:";
+  let out = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const i = text.indexOf(marker, cursor);
+    if (i === -1) {
+      out += text.slice(cursor);
+      break;
+    }
+    out += text.slice(cursor, i);
+    let p = i + marker.length;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    if (p >= text.length || text[p] !== "{") {
+      cursor = i + marker.length;
+      continue;
+    }
+    const jsonStart = p;
+    let depth = 0;
+    let q = jsonStart;
+    for (; q < text.length; q++) {
+      const c = text[q];
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) {
+          q++;
+          break;
+        }
+      }
+    }
+    if (depth !== 0) {
+      return { text: out.trimEnd(), roadmaps };
+    }
+    const jsonStr = text.slice(jsonStart, q);
+    let end = q;
+    while (end < text.length && /\s/.test(text[end])) end++;
+    if (text[end] !== "]") {
+      return { text: out.trimEnd(), roadmaps };
+    }
+    end++;
+    try {
+      roadmaps.push(JSON.parse(jsonStr) as Roadmap);
+      out += `[[ROADMAP:${roadmaps.length - 1}]]`;
+      cursor = end;
+    } catch {
+      return { text: out.trimEnd(), roadmaps };
+    }
+  }
+  return { text: out.trim(), roadmaps };
+}
+
+/** Hide any trailing incomplete structured tag while the model is still streaming. */
+function stripPartialOpenTag(text: string, marker: string): string {
+  const i = text.indexOf(marker);
+  if (i === -1) return text;
+  return text.slice(0, i).trimEnd();
+}
+
+function sanitizeAssistantMessageText(text: string): string {
+  let t = stripShowConstellationTag(text);
+  t = t.replace(/^\[STAGE:(?:Explore|Plan|Build|Reflect)\]\s*/m, "");
+  t = stripActionPlanTags(t);
+  t = stripShowRoadmapTags(t);
+  if (t.includes("[ACTION_PLAN:")) t = stripPartialOpenTag(t, "[ACTION_PLAN:");
+  if (t.includes("[SHOW_ROADMAP:")) t = stripPartialOpenTag(t, "[SHOW_ROADMAP:");
+  return t;
+}
+
 /** Strip from UI always; constellation UI only toggles on first trigger in this session. */
 const SHOW_CONSTELLATION_RE = /\[SHOW_CONSTELLATION\]\s*/g;
-const SHOW_ROADMAP_RE = /\[SHOW_ROADMAP:\s*(\{[\s\S]*?\})\]/g;
 const ROADMAP_PLACEHOLDER_RE = /\[\[ROADMAP:(\d+)\]\]/g;
 
 function stripShowConstellationTag(text: string): string {
@@ -89,7 +215,7 @@ function stripShowConstellationTag(text: string): string {
 }
 
 function renderAssistantContent(msg: ChatMessage) {
-  const raw = stripShowConstellationTag(msg.content);
+  const raw = sanitizeAssistantMessageText(msg.content);
   const roadmaps = msg.roadmaps ?? [];
 
   if (roadmaps.length === 0 || !ROADMAP_PLACEHOLDER_RE.test(raw)) {
@@ -340,25 +466,11 @@ const PathfinderChat = () => {
                 }
               }
 
-              // Inline roadmap tag parsing: replace tag with placeholder and store parsed payload
-              let roadmaps: Roadmap[] | undefined;
-              if (SHOW_ROADMAP_RE.test(display)) {
-                SHOW_ROADMAP_RE.lastIndex = 0;
-                roadmaps = [];
-                let roadmapIndex = 0;
-                display = display.replace(SHOW_ROADMAP_RE, (_full, jsonPayload: string) => {
-                  try {
-                    const parsed = JSON.parse(jsonPayload) as Roadmap;
-                    roadmaps!.push(parsed);
-                    const placeholder = `[[ROADMAP:${roadmapIndex}]]`;
-                    roadmapIndex += 1;
-                    return placeholder;
-                  } catch {
-                    return "";
-                  }
-                });
-              }
-              SHOW_ROADMAP_RE.lastIndex = 0;
+              // Roadmap tags: brace-balanced JSON, placeholders for cards; incomplete tags hidden
+              const rm = replaceShowRoadmapTagsWithPlaceholders(display);
+              display = rm.text;
+              const roadmaps: Roadmap[] | undefined =
+                rm.roadmaps.length > 0 ? rm.roadmaps : undefined;
 
               const actionPlanPayloads: { jsonStr: string }[] = [];
               forEachActionPlanTag(display, ({ jsonStr }) => actionPlanPayloads.push({ jsonStr }));
@@ -393,7 +505,13 @@ const PathfinderChat = () => {
                     /* JSON incomplete until more deltas arrive */
                   }
                 }
-                display = stripActionPlanTags(display);
+              }
+              display = stripActionPlanTags(display);
+              if (display.includes("[ACTION_PLAN:")) {
+                display = stripPartialOpenTag(display, "[ACTION_PLAN:");
+              }
+              if (display.includes("[SHOW_ROADMAP:")) {
+                display = stripPartialOpenTag(display, "[SHOW_ROADMAP:");
               }
 
               setMessages((prev) => {
@@ -722,109 +840,87 @@ const PathfinderChat = () => {
         </div>
       )}
 
-      {/* Messages (scroll) + action plan above input; both constrained so the input row never overlaps tall cards */}
+      {/* Single scroll feed: messages, then action plan card inline, then input fixed below */}
       <div
+        ref={scrollRef}
         style={{
           flex: 1,
           minHeight: 0,
-          overflow: "hidden",
+          overflowY: "auto",
+          overflowX: "hidden",
           display: "flex",
           flexDirection: "column",
+          gap: 12,
         }}
       >
-        <div
-          ref={scrollRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: "auto",
-            overflowX: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {messages.length === 0 && (
-            <p style={{ color: "#999", textAlign: "center", marginTop: 60, fontSize: 14 }}>
-              Start a conversation with Vamos Pathfinder
-            </p>
-          )}
+        {messages.length === 0 && (
+          <p style={{ color: "#999", textAlign: "center", marginTop: 60, fontSize: 14 }}>
+            Start a conversation with Vamos Pathfinder
+          </p>
+        )}
 
-          {messages.map((msg, i) => (
-            <div key={i}>
+        {messages.map((msg, i) => (
+          <div key={i}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+              }}
+            >
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  style={{
-                    background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
-                    color: msg.role === "user" ? "#fff" : "#222",
-                    padding: "12px 16px",
-                    borderRadius: 12,
-                    maxWidth: "85%",
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                      {renderAssistantContent(msg)}
-                    </div>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-              </div>
-
-              {msg.showConstellation && (
-                <div ref={constellationRef} style={{ margin: "12px 0" }}>
-                  <IndustryConstellation onClusterClick={handleClusterClick} highlightClusterId={highlightClusterId} />
-                </div>
-              )}
-
-              {/* Save prompt after constellation exploration */}
-              {msg.showConstellation && showSaveAfterConstellation && !user && !isStreaming && exploredClusters.length > 0 && (
-                <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
-              )}
-
-            </div>
-          ))}
-
-          {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
-            <div style={{ display: "flex", justifyContent: "flex-start" }}>
-              <div
-                style={{
-                  background: "#F5F5F5",
-                  color: "#888",
+                  background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
+                  color: msg.role === "user" ? "#fff" : "#222",
                   padding: "12px 16px",
                   borderRadius: 12,
+                  maxWidth: "85%",
                   fontSize: 14,
-                  fontStyle: "italic",
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
                 }}
               >
-                Thinking...
+                {msg.role === "assistant" ? (
+                  <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                    {renderAssistantContent(msg)}
+                  </div>
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
-          )}
-        </div>
+
+            {msg.showConstellation && (
+              <div ref={constellationRef} style={{ margin: "12px 0" }}>
+                <IndustryConstellation onClusterClick={handleClusterClick} highlightClusterId={highlightClusterId} />
+              </div>
+            )}
+
+            {msg.showConstellation && showSaveAfterConstellation && !user && !isStreaming && exploredClusters.length > 0 && (
+              <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
+            )}
+          </div>
+        ))}
+
+        {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div
+              style={{
+                background: "#F5F5F5",
+                color: "#888",
+                padding: "12px 16px",
+                borderRadius: 12,
+                fontSize: 14,
+                fontStyle: "italic",
+              }}
+            >
+              Thinking...
+            </div>
+          </div>
+        )}
 
         {actionPlan && (
-          <div
-            style={{
-              flex: "0 1 auto",
-              minHeight: 0,
-              maxHeight: "min(52vh, 520px)",
-              overflowY: "auto",
-              overflowX: "hidden",
-              WebkitOverflowScrolling: "touch",
-              paddingTop: 8,
-            }}
-          >
+          <div style={{ width: "100%", maxWidth: "100%", paddingTop: 4 }}>
             <ActionPlanCard
               plan={actionPlan}
               isFirst={actionPlanCount <= 1}

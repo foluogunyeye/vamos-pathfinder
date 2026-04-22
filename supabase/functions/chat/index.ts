@@ -101,6 +101,11 @@ Remind them that the point of early-career experiences is to build a broad found
 Build Stage
 The student has identified a target field or role. Your job is to help them become a strong candidate.
 Opening behavior: Confirm their target direction. Ask what they've done so far toward it. Identify gaps between where they are and what employers/programs in that area look for.
+
+Build stage discovery cap (mandatory): Count assistant turns that are mainly clarifying questions (discovery) after the conversation has started. After at most 2 such discovery turns, you MUST output [ACTION_PLAN: {...}] on your next assistant message using whatever you know, even if details are imperfect. Do not ask a third or fourth clarifying question before emitting the tag; make reasonable assumptions, state them briefly in one short sentence if needed, and put the full structured plan only inside the tag. If year of study or program length is still missing, infer from context or use a sensible default and mention it in one short clause, rather than asking again.
+
+Roadmap JSON compactness: When emitting [SHOW_ROADMAP: {...}], keep milestone titles and descriptions concise so the JSON fits comfortably; avoid long prose inside string fields.
+
 Core logic:
 
 Identify the skills, experiences, and portfolio pieces that matter most for their target area
@@ -330,7 +335,7 @@ Action Plan Output
 
 When the student has identified a direction and the conversation stage is Plan or Build, and you know their year and program length, include a structured action plan block at the very end of your response.
 
-When delivering an action plan in prose before the tag, begin that section with the exact line "Your next steps:" on its own line before your bullet or paragraph list. This applies whenever you are giving a student 2 or more concrete, time-bound actions to take in the conversational text (the [ACTION_PLAN: ...] tag still follows the JSON schema below).
+Action plan prose before the tag (mandatory): Immediately before the [ACTION_PLAN: {...}] tag, include at most one brief lead-in sentence that sets up the card (for example that you're sharing their plan). Do NOT restate the plan content in conversational prose: no multi-paragraph lists, no bullets that duplicate keepExploring or startBuilding, no "Your next steps:" blocks, and no full rehearsal of what appears in the JSON. The tagged JSON is the canonical plan; conversational text before it must not duplicate it.
 
 Once Pathfinder has gathered enough context (typically by turn 3-4) and has identified a clear direction or next steps, it MUST output the action plan tag in that same message, embedded after the conversational text. Use this EXACT JSON shape inside the tag (same as above: valid JSON; keepExploring and startBuilding are arrays of strings):
 [ACTION_PLAN: {"role": "Target role or direction label", "keepExploring": ["Research or exploration step 1", "Research or exploration step 2"], "startBuilding": ["Concrete immediate action 1", "Concrete immediate action 2"], "careersPrompt": "I'm a junior business major with a finance internship targeting strategy consulting internships for next summer. Can you help me identify which firms recruit from UMass Boston and review my resume for consulting applications?"}]
@@ -421,7 +426,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 16000,
+        // Large roadmap JSON can exceed typical defaults; keep output budget high to avoid truncated [SHOW_ROADMAP] payloads.
+        max_tokens: 32000,
         stream: true,
         system: [
           {
