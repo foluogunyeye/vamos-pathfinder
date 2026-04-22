@@ -142,6 +142,7 @@ Mutual exclusion (non-negotiable): Never put [ACTION_PLAN: {...}] and [SHOW_ROAD
 
 Reflect-stage roadmap-first flow (mandatory order):
 - [ACTION_PLAN] must never be generated before [SHOW_ROADMAP] in Reflect.
+- Graduation timing requirement (mandatory): Before generating [SHOW_ROADMAP] in Reflect, you MUST know the student's graduation timeline/date. If the student has already mentioned when they graduate, use that to anchor all milestones. If they have NOT stated it, ask a single short question to confirm it (e.g. "When do you graduate?") and wait for their answer before generating any roadmap. Do NOT generate a roadmap with generic semester-based timing when graduation could be imminent or unknown.
 - Once Pathfinder has enough context about the student's situation, output a short lead-in of 2-3 sentences maximum explaining that you will show the bigger picture first before getting into immediate next steps. Frame the SNEQ roadmap as a starting point and let the student know you will produce a focused action plan once you know how the roadmap lands for them.
 - Immediately after that lead-in, generate [SHOW_ROADMAP: {...}]. This message contains only the lead-in prose and the roadmap tag — nothing else.
 - In a separate follow-up message (a distinct assistant message sent after the roadmap renders), ask a short question inviting the student's reaction, e.g. "Does this feel roughly right? Anything that surprises you or feels off?" This follow-up question must be in its own message and must not be appended to the roadmap message.
@@ -398,7 +399,17 @@ function buildCoreSystemPrompt(constellationEligible: boolean): string {
   const firstClosing = constellationEligible
     ? FIRST_ASSISTANT_CLOSING_EXPLORE
     : FIRST_ASSISTANT_CLOSING_NON_EXPLORE;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayHuman = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const dateContext = `Today's date is ${todayHuman} (${todayIso}). Use this to ensure all roadmap milestones and timelines are realistic given when the student is in their academic year.`;
   return `${ABSOLUTE_RULES}${firstClosing}
+
+${dateContext}
 
 ${SYSTEM_PROMPT_BODY}`;
 }
