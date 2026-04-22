@@ -649,9 +649,12 @@ const PathfinderChat = () => {
       style={{
         display: "flex",
         height: "100dvh",
+        maxHeight: "100dvh",
         width: "100%",
+        minHeight: 0,
         justifyContent: "center",
         alignItems: "stretch",
+        overflow: "hidden",
       }}
     >
       {showJourneyRoadmap && (
@@ -663,11 +666,14 @@ const PathfinderChat = () => {
         width: "100%",
         flex: 1,
         minWidth: 0,
+        minHeight: 0,
         padding: "24px 16px",
         fontFamily: "system-ui, -apple-system, sans-serif",
         display: "flex",
         flexDirection: "column",
         height: "100dvh",
+        maxHeight: "100dvh",
+        overflow: "hidden",
         boxSizing: "border-box",
       }}
     >
@@ -716,18 +722,27 @@ const PathfinderChat = () => {
         </div>
       )}
 
-      {/* Messages (scroll) + action plan pinned above input — card stays out of overflow so it does not scroll away or reflow during streaming */}
+      {/* Messages (scroll) + action plan above input; both constrained so the input row never overlaps tall cards */}
       <div
         style={{
           flex: 1,
           minHeight: 0,
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         }}
       >
         <div
           ref={scrollRef}
-          style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
         >
           {messages.length === 0 && (
             <p style={{ color: "#999", textAlign: "center", marginTop: 60, fontSize: 14 }}>
@@ -799,7 +814,17 @@ const PathfinderChat = () => {
         </div>
 
         {actionPlan && (
-          <div style={{ flexShrink: 0, paddingTop: 8 }}>
+          <div
+            style={{
+              flex: "0 1 auto",
+              minHeight: 0,
+              maxHeight: "min(52vh, 520px)",
+              overflowY: "auto",
+              overflowX: "hidden",
+              WebkitOverflowScrolling: "touch",
+              paddingTop: 8,
+            }}
+          >
             <ActionPlanCard
               plan={actionPlan}
               isFirst={actionPlanCount <= 1}
@@ -813,8 +838,18 @@ const PathfinderChat = () => {
         )}
       </div>
 
-      {/* Input */}
-      <div style={{ display: "flex", gap: 8, paddingTop: 12 }}>
+      {/* Input — always at bottom of column; flexShrink 0 keeps it out of the scroll/middle flex fight */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          paddingTop: 12,
+          flexShrink: 0,
+          position: "relative",
+          zIndex: 2,
+          backgroundColor: "hsl(var(--background))",
+        }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
