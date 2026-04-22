@@ -19,8 +19,10 @@ import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabaseEnv";
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  type?: "text" | "action_plan";
   showConstellation?: boolean;
   roadmaps?: Roadmap[];
+  actionPlan?: ActionPlan;
 }
 
 const STAGE_REGEX = /^\[STAGE:(Explore|Plan|Build|Reflect)\]\s*/;
@@ -388,6 +390,8 @@ const PathfinderChat = () => {
     /** 1-based index of this assistant reply (opening message = 1). Used to ignore spurious [STAGE:Plan] early in Build/Reflect. */
     const assistantTurnNumber =
       allMessages.filter((m) => m.role === "assistant").length + 1;
+    /** Index of the streaming assistant text message in `messages` state. */
+    let streamingMsgIndex = -1;
 
     const apiMessages = allMessages.map(({ role, content }) => ({ role, content }));
     const ctx = ctxOverride ?? stageContext;
@@ -424,7 +428,10 @@ const PathfinderChat = () => {
       let accumulated = "";
       let buffer = "";
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      setMessages((prev) => {
+        streamingMsgIndex = prev.length;
+        return [...prev, { role: "assistant", type: "text", content: "" }];
+      });
 
       while (true) {
         const { done, value } = await reader.read();
@@ -508,6 +515,19 @@ const PathfinderChat = () => {
                       actionPlanConsumedForSessionRef.current = true;
                       setActionPlanCount((prev) => prev + 1);
                       setActionPlanOffered(true);
+                      // Inject an inline action plan message item immediately after the streaming assistant text message.
+                      setMessages((prev) => {
+                        if (prev.some((m) => m.type === "action_plan")) return prev;
+                        const next = [...prev];
+                        const idx = streamingMsgIndex >= 0 ? streamingMsgIndex : next.length - 1;
+                        next.splice(idx + 1, 0, {
+                          role: "assistant",
+                          type: "action_plan",
+                          content: "",
+                          actionPlan: normalized,
+                        });
+                        return next;
+                      });
                     }
                   } catch {
                     /* JSON incomplete until more deltas arrive */
@@ -524,11 +544,13 @@ const PathfinderChat = () => {
 
               setMessages((prev) => {
                 const updated = [...prev];
-                const prevLast = updated[updated.length - 1];
-                updated[updated.length - 1] = {
+                const idx = streamingMsgIndex >= 0 ? streamingMsgIndex : updated.length - 1;
+                const prevMsg = updated[idx];
+                updated[idx] = {
                   role: "assistant",
+                  type: "text",
                   content: display,
-                  showConstellation: showConst || prevLast?.showConstellation === true,
+                  showConstellation: showConst || prevMsg?.showConstellation === true,
                   roadmaps,
                 };
                 return updated;
@@ -869,34 +891,54 @@ const PathfinderChat = () => {
 
         {messages.map((msg, i) => (
           <div key={i}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
+            {msg.type === "action_plan" ? (
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                <div style={{ maxWidth: "85%", width: "100%" }}>
+                  {msg.actionPlan && (
+                    <ActionPlanCard
+                      plan={msg.actionPlan}
+                      isFirst={actionPlanCount <= 1}
+                      connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
+                      onExploreMore={() =>
+                        constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+                      }
+                    />
+                  )}
+                  {showSaveAfterActionPlan && !user && !isStreaming && (
+                    <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
+                  )}
+                </div>
+              </div>
+            ) : (
               <div
                 style={{
-                  background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
-                  color: msg.role === "user" ? "#fff" : "#222",
-                  padding: "12px 16px",
-                  borderRadius: 12,
-                  maxWidth: "85%",
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
+                  display: "flex",
+                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
                 }}
               >
-                {msg.role === "assistant" ? (
-                  <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                    {renderAssistantContent(msg)}
-                  </div>
-                ) : (
-                  msg.content
-                )}
+                <div
+                  style={{
+                    background: msg.role === "user" ? "#53D88B" : "#F5F5F5",
+                    color: msg.role === "user" ? "#fff" : "#222",
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    maxWidth: "85%",
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                      {renderAssistantContent(msg)}
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {msg.showConstellation && (
               <div ref={constellationRef} style={{ margin: "12px 0" }}>
@@ -927,21 +969,7 @@ const PathfinderChat = () => {
           </div>
         )}
 
-        {actionPlan && (
-          <div style={{ display: "flex", justifyContent: "flex-start", paddingTop: 4 }}>
-            <div style={{ maxWidth: "85%", width: "100%" }}>
-              <ActionPlanCard
-                plan={actionPlan}
-                isFirst={actionPlanCount <= 1}
-                connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
-                onExploreMore={() => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-              />
-              {showSaveAfterActionPlan && !user && !isStreaming && (
-                <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
-              )}
-            </div>
-          </div>
-        )}
+        {/* Action plan now renders inline as its own message item (see messages.map). */}
       </div>
 
       {/* Input — always at bottom of column; flexShrink 0 keeps it out of the scroll/middle flex fight */}
