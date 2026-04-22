@@ -1,13 +1,15 @@
-import { useState } from "react";
-import { Check, ChevronDown, ChevronUp, MapPin } from "lucide-react";
+import { Check, MapPin } from "lucide-react";
 import { CLUSTERS } from "@/data/constellationData";
 import type { Stage } from "./StageBadge";
 import type { ActionPlan } from "./ActionPlanCard";
+import type { Roadmap } from "./RoadmapCard";
 
 interface ProgressSidebarProps {
   exploredClusters: string[];
   currentStage: Stage;
   actionPlan: ActionPlan | null;
+  roadmapShown: boolean;
+  roadmap: Roadmap | null;
   isAuthenticated: boolean;
   onClusterNavigate?: (clusterId: string) => void;
 }
@@ -23,10 +25,84 @@ const ProgressSidebar = ({
   exploredClusters,
   currentStage,
   actionPlan,
+  roadmapShown,
+  roadmap,
   isAuthenticated,
   onClusterNavigate,
 }: ProgressSidebarProps) => {
-  const [planExpanded, setPlanExpanded] = useState(false);
+  const actionPlanReady = !!actionPlan;
+  const roadmapReady = roadmapShown && !!roadmap;
+  const actionPlanGateOpen = currentStage === "Build" || currentStage === "Reflect" ? roadmapReady : true;
+
+  const planPreviewSteps = (() => {
+    if (!actionPlan) return [];
+    const steps = [
+      ...(actionPlan.startBuilding ?? []),
+      ...(actionPlan.keepExploring ?? []),
+    ].filter(Boolean);
+    return steps.slice(0, 2);
+  })();
+
+  const roadmapBreakdown = (() => {
+    if (!roadmap || !Array.isArray((roadmap as any).milestones)) return null;
+    const milestones = (roadmap as any).milestones as Array<{ type?: string }>;
+    const counts: Record<string, number> = {};
+    for (const m of milestones) {
+      const t = (m.type ?? "").toLowerCase();
+      if (!t) continue;
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    const total = milestones.length;
+    const parts: string[] = [];
+    const order: Array<[string, string]> = [
+      ["skill", "Skill"],
+      ["network", "Network"],
+      ["experience", "Experience"],
+      ["qualification", "Qualification"],
+    ];
+    for (const [k, label] of order) {
+      const n = counts[k] ?? 0;
+      if (n > 0) parts.push(`${n} ${label}`);
+    }
+    if (parts.length === 0) return `${total} milestones`;
+    return `${total} milestones: ${parts.join(", ")}`;
+  })();
+
+  const CheckboxRow = ({
+    label,
+    checked,
+    disabled,
+  }: {
+    label: string;
+    checked: boolean;
+    disabled?: boolean;
+  }) => {
+    const border = checked ? "#53D88B" : "#ccc";
+    const fill = checked ? "#53D88B" : "transparent";
+    const text = disabled ? "#bbb" : "#333";
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: disabled ? 0.55 : 1 }}>
+        <div
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            background: fill,
+            border: `1.5px solid ${border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            transition: "all 0.2s",
+          }}
+          aria-hidden
+        >
+          {checked && <Check size={10} color="#fff" strokeWidth={3} />}
+        </div>
+        <span style={{ fontSize: 12, color: text, fontWeight: 500 }}>{label}</span>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -154,8 +230,8 @@ const ProgressSidebar = ({
         </div>
       )}
 
-      {/* Action plan summary */}
-      {actionPlan && (
+      {/* Toolkit output progress (Plan/Build/Reflect). Explore already handled by constellation/clusters above. */}
+      {currentStage !== "Explore" && (
         <div style={{ marginBottom: 24 }}>
           <p
             style={{
@@ -164,63 +240,86 @@ const ProgressSidebar = ({
               textTransform: "uppercase",
               letterSpacing: "1.5px",
               color: "#aaa",
-              margin: "0 0 8px",
+              margin: "0 0 10px",
             }}
           >
-            Action Plan
+            Toolkit outputs
           </p>
-          <button
-            onClick={() => setPlanExpanded(!planExpanded)}
-            style={{
-              width: "100%",
-              background: "#F0FFF5",
-              border: "1px solid #D3FFE3",
-              borderRadius: 8,
-              padding: "10px 12px",
-              cursor: "pointer",
-              textAlign: "left",
-              fontFamily: "'Roboto', sans-serif",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#53D88B" }}>
-                {actionPlan.role}
-              </span>
-              {planExpanded ? (
-                <ChevronUp size={14} color="#53D88B" />
-              ) : (
-                <ChevronDown size={14} color="#53D88B" />
+
+          {/* Plan: action plan only */}
+          {currentStage === "Plan" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <CheckboxRow label="Action plan" checked={actionPlanReady} />
+              {actionPlanReady && (
+                <div
+                  style={{
+                    background: "#F0FFF5",
+                    border: "1px solid #D3FFE3",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 6 }}>
+                    {actionPlan?.role ?? "Your direction"}
+                  </div>
+                  {planPreviewSteps.slice(0, 2).map((s, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#555", lineHeight: 1.4, marginTop: i === 0 ? 0 : 4 }}>
+                      {i + 1}. {s}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-            {planExpanded && (
-              <div style={{ marginTop: 10 }}>
-                {actionPlan.keepExploring && actionPlan.keepExploring.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "#53D88B", margin: "0 0 4px", textTransform: "uppercase" }}>
-                      Keep Exploring
-                    </p>
-                    {actionPlan.keepExploring.map((item, i) => (
-                      <p key={i} style={{ fontSize: 11, color: "#555", margin: "0 0 3px", lineHeight: 1.4 }}>
-                        {i + 1}. {item}
-                      </p>
-                    ))}
+          )}
+
+          {/* Build/Reflect: roadmap then gated action plan */}
+          {(currentStage === "Build" || currentStage === "Reflect") && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <CheckboxRow label="Roadmap" checked={roadmapReady} />
+                {roadmapReady && (
+                  <div
+                    style={{
+                      background: "#F6FFFA",
+                      border: "1px solid #D3FFE3",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 4 }}>
+                      {roadmap?.goal ?? "Your direction"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#555", lineHeight: 1.4 }}>
+                      {roadmapBreakdown ?? "Roadmap generated"}
+                    </div>
                   </div>
                 )}
-                {actionPlan.startBuilding && actionPlan.startBuilding.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "#F5C423", margin: "0 0 4px", textTransform: "uppercase" }}>
-                      Start Building
-                    </p>
-                    {actionPlan.startBuilding.map((item, i) => (
-                      <p key={i} style={{ fontSize: 11, color: "#555", margin: "0 0 3px", lineHeight: 1.4 }}>
-                        {i + 1}. {item}
-                      </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <CheckboxRow label="Action plan" checked={actionPlanReady} disabled={!actionPlanGateOpen} />
+                {actionPlanReady && (
+                  <div
+                    style={{
+                      background: "#F0FFF5",
+                      border: "1px solid #D3FFE3",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#53D88B", marginBottom: 6 }}>
+                      {actionPlan?.role ?? "Your direction"}
+                    </div>
+                    {planPreviewSteps.slice(0, 2).map((s, i) => (
+                      <div key={i} style={{ fontSize: 11, color: "#555", lineHeight: 1.4, marginTop: i === 0 ? 0 : 4 }}>
+                        {i + 1}. {s}
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-          </button>
+            </div>
+          )}
         </div>
       )}
 

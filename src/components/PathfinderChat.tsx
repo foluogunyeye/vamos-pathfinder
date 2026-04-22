@@ -789,6 +789,10 @@ const PathfinderChat = () => {
   const showSidebar = !isMobile && started && constellationShown;
   const showJourneyRoadmap = !isMobile && started;
   const roadmapShown = messages.some((m) => (m.roadmaps?.length ?? 0) > 0);
+  const latestRoadmap =
+    [...messages]
+      .reverse()
+      .find((m) => (m.roadmaps?.length ?? 0) > 0)?.roadmaps?.[0] ?? null;
 
   return (
     <div
@@ -1031,6 +1035,8 @@ const PathfinderChat = () => {
           exploredClusters={exploredClusters}
           currentStage={currentStage}
           actionPlan={actionPlan}
+          roadmapShown={roadmapShown}
+          roadmap={latestRoadmap}
           isAuthenticated={!!user}
           onClusterNavigate={handleClusterNavigate}
         />
