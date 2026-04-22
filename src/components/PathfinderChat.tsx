@@ -928,16 +928,18 @@ const PathfinderChat = () => {
         )}
 
         {actionPlan && (
-          <div style={{ width: "100%", maxWidth: "100%", paddingTop: 4 }}>
-            <ActionPlanCard
-              plan={actionPlan}
-              isFirst={actionPlanCount <= 1}
-              connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
-              onExploreMore={() => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-            />
-            {showSaveAfterActionPlan && !user && !isStreaming && (
-              <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
-            )}
+          <div style={{ display: "flex", justifyContent: "flex-start", paddingTop: 4 }}>
+            <div style={{ maxWidth: "85%", width: "100%" }}>
+              <ActionPlanCard
+                plan={actionPlan}
+                isFirst={actionPlanCount <= 1}
+                connectedClusters={selectedClusterId ? getConnectedClusterNames(selectedClusterId) : []}
+                onExploreMore={() => constellationRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+              />
+              {showSaveAfterActionPlan && !user && !isStreaming && (
+                <SaveProgressPrompt onSubmit={handleMagicLinkSubmit} isAuthenticated={!!user} />
+              )}
+            </div>
           </div>
         )}
       </div>
